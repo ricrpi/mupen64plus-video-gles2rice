@@ -315,6 +315,8 @@ void CRender::SetCombinerAndBlender()
         m_pAlphaBlender->InitBlenderMode();
 
     m_pColorCombiner->InitCombinerMode();
+    
+    ApplyTextureFilter();
 }
 
 void CRender::RenderReset()
@@ -1918,8 +1920,6 @@ void CRender::UpdateScissorWithClipRatio()
 // Set other modes not covered by color combiner or alpha blender
 void CRender::InitOtherModes(void)
 {
-    ApplyTextureFilter();
-
     //
     // I can't think why the hand in mario's menu screen is rendered with an opaque rendermode,
     // and no alpha threshold. We set the alpha reference to 1 to ensure that the transparent pixels
