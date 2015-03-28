@@ -35,6 +35,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "TextureManager.h"
 #include "Video.h"
 
+#ifdef VC
+#include <bcm_host.h>
+#endif
+
 #define INI_FILE        "RiceVideoLinux.ini"
 
 static m64p_handle l_ConfigVideoRice = NULL;
@@ -206,6 +210,11 @@ SettingInfo OnScreenDisplaySettings[] =
 };
 
 const int numberOfOpenGLRenderEngineSettings = sizeof(OpenGLRenderSettings)/sizeof(RenderEngineSetting);
+
+#ifdef VC
+static unsigned g_fb_width;
+static unsigned g_fb_height;
+#endif
 
 void GenerateFrameBufferOptions(void)
 {
@@ -432,7 +441,20 @@ bool isSSESupported()
 static void ReadConfiguration(void)
 {
     windowSetting.bDisplayFullscreen = ConfigGetParamBool(l_ConfigVideoGeneral, "Fullscreen");
+    windowSetting.uDisplayHeight = ConfigGetParamInt(l_ConfigVideoGeneral, "ScreenHeight");
     windowSetting.uDisplayWidth = ConfigGetParamInt(l_ConfigVideoGeneral, "ScreenWidth");
+#if VC
+	if(windowSetting.bDisplayFullscreen==1)
+	{
+		if (graphics_get_display_size(0 /* LCD */, &g_fb_width, &g_fb_height) < 0)
+		{
+        	printf("ERROR: Failed to get display size\n");
+    	}
+    	windowSetting.uDisplayWidth = g_fb_width;
+    	windowSetting.uDisplayHeight = g_fb_height;
+	}
+#endif    
+
 #if 1
 	windowSetting.bDisplayRatio = true;
 	windowSetting.uDisplayX = 0;
@@ -445,7 +467,6 @@ static void ReadConfiguration(void)
 		}
 	}
 #endif
-    windowSetting.uDisplayHeight = ConfigGetParamInt(l_ConfigVideoGeneral, "ScreenHeight");
     windowSetting.bVerticalSync = ConfigGetParamBool(l_ConfigVideoGeneral, "VerticalSync");
 
     defaultRomOptions.N64FrameBufferEmuType = ConfigGetParamInt(l_ConfigVideoRice, "FrameBufferSetting");
