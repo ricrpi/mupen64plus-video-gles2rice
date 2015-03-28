@@ -192,6 +192,7 @@ enum HACK_FOR_GAMES
     HACK_FOR_DUKE_NUKEM,
     HACK_FOR_ZELDA_MM,
     HACK_FOR_MARIO_KART,
+    HACK_FOR_SUPER_MARIO_64,
 };
 
 enum {
@@ -207,11 +208,11 @@ typedef struct {
     BOOL    bEnableSSE;
     BOOL    bEnableVertexShader;
     BOOL    bSkipFrame;
-	BOOL    bSkipUpdate;
     BOOL    bFullTMEM;
     BOOL    bUseFullTMEM;
 
     BOOL    bShowFPS;
+    BOOL    bWideScreenHack;
 
     uint32  mipmapping;
     uint32  fogMethod;

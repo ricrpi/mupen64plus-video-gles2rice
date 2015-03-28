@@ -18,7 +18,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <stdlib.h>
 
-#include <GLES2/gl2.h>
 #include "Config.h"
 #include "Debugger.h"
 #include "OGLDebug.h"
@@ -56,12 +55,12 @@ COGLTexture::COGLTexture(uint32 dwWidth, uint32 dwHeight, TextureUsage usage) :
     {
     case TXT_QUALITY_DEFAULT:
         if( options.colorQuality == TEXTURE_FMT_A4R4G4B4 ) 
-            m_glFmt = GL_RGBA; // = GL_RGBA4;
+            m_glFmt = GL_RGBA4;
         break;
     case TXT_QUALITY_32BIT:
         break;
     case TXT_QUALITY_16BIT:
-            m_glFmt = GL_RGBA; // = GL_RGBA4;
+            m_glFmt = GL_RGBA4;
         break;
     };
     LOG_TEXTURE(TRACE2("New texture: (%d, %d)", dwWidth, dwHeight));
@@ -98,6 +97,10 @@ void COGLTexture::EndUpdate(DrawInfo *di)
 {
     COGLGraphicsContext *pcontext = (COGLGraphicsContext *)(CGraphicsContext::g_pGraphicsContext); // we need this to check if the GL extension is avaible
 
+#if SDL_VIDEO_OPENGL_ES2
+    pglActiveTexture(GL_TEXTURE0_ARB);
+    OPENGL_CHECK_ERRORS;
+#endif
     glBindTexture(GL_TEXTURE_2D, m_dwTextureName);
     OPENGL_CHECK_ERRORS;
 
@@ -110,11 +113,11 @@ void COGLTexture::EndUpdate(DrawInfo *di)
         int m_maximumAnistropy = pcontext->getMaxAnisotropicFiltering(); //if getMaxAnisotropicFiltering() return more than 0, so aniso is supported and maxAnisotropicFiltering is set
 
         // Set Anisotropic filtering (mipmapping have to be activated, aniso filtering is not effective without)
-       /* TODO if( m_maximumAnistropy )
+        if( m_maximumAnistropy )
         {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, m_maximumAnistropy);
             OPENGL_CHECK_ERRORS;
-        }*/
+        }
 
         // Set Mipmap
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
@@ -123,6 +126,8 @@ void COGLTexture::EndUpdate(DrawInfo *di)
 #if SDL_VIDEO_OPENGL
         // Tell to hardware to generate mipmap (himself) when glTexImage2D is called
         glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
+#elif SDL_VIDEO_OPENGL_ES2
+        glGenerateMipmap(GL_TEXTURE_2D);
 #endif
         OPENGL_CHECK_ERRORS;
     }
@@ -137,10 +142,9 @@ void COGLTexture::EndUpdate(DrawInfo *di)
     glTexImage2D(GL_TEXTURE_2D, 0, m_glFmt, m_dwCreatedTextureWidth, m_dwCreatedTextureHeight, 0, GL_BGRA_EXT, GL_UNSIGNED_BYTE, m_pTexture);
 #elif SDL_VIDEO_OPENGL_ES2
     //GL_BGRA_IMG works on adreno but not inside profiler.
-    glTexImage2D(GL_TEXTURE_2D, 0, m_glFmt, m_dwCreatedTextureWidth, m_dwCreatedTextureHeight, 0, m_glFmt, GL_UNSIGNED_BYTE, m_pTexture);
-    //fprintf(stderr, "glTexImage2d(m_glFmt=%X,  m_dwCreatedTextureWidth=%d, m_dwCreatedTextureHeight=%d\n", m_glFmt, m_dwCreatedTextureWidth, m_dwCreatedTextureHeight);
-    if(options.mipmapping)
-        glGenerateMipmap(GL_TEXTURE_2D);
+    glTexImage2D(GL_TEXTURE_2D, 0, m_glFmt, m_dwCreatedTextureWidth, m_dwCreatedTextureHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, m_pTexture);
+    OPENGL_CHECK_ERRORS;
+    glBindTexture(GL_TEXTURE_2D, 0);
 #endif
     OPENGL_CHECK_ERRORS;
 }

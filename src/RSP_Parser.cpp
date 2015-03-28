@@ -18,7 +18,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include <algorithm>
-extern "C" { extern int SDL_GetTicks(void); }
+#include <SDL.h>
 
 #include "ConvertImage.h"
 #include "GraphicsContext.h"
@@ -27,10 +27,6 @@ extern "C" { extern int SDL_GetTicks(void); }
 #include "Video.h"
 #include "ucode.h"
 #include <time.h>
-
-#include "Profiler.h"
-
-#define TEXTURE_TTL (50)	// Purge Textures after X ms TODO Optimize?
 
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -784,6 +780,13 @@ uint32 DLParser_CheckUcode(uint32 ucStart, uint32 ucDStart, uint32 ucSize, uint3
 extern int dlistMtxCount;
 extern bool bHalfTxtScale;
 
+extern float mspervi;
+extern float numvi;
+static int skipframe=0;
+static unsigned int oldtick=0;
+static int oldskip=0;
+extern bool skipping;
+
 void DLParser_Process(OSTask * pTask)
 {
     static int skipframe=0;
@@ -794,15 +797,13 @@ void DLParser_Process(OSTask * pTask)
 
     if ( CRender::g_pRender == NULL)
     {
-		Profile_start("DLParser_Process - TriggerDPInterrupt");
         TriggerDPInterrupt();
         TriggerSPInterrupt();
-		Profile_end();
         return;
     }
 
     status.bScreenIsDrawn = true;
-	if( options.bSkipFrame )
+/*    if( options.bSkipFrame )
     {
         skipframe++;
         if(skipframe%2)
@@ -812,12 +813,42 @@ void DLParser_Process(OSTask * pTask)
             return;
         }
     }
-
-	
-    
+*/
     if( currentRomOptions.N64RenderToTextureEmuType != TXT_BUF_NONE && defaultRomOptions.bSaveVRAM )
     {
         g_pFrameBufferManager->CheckRenderTextureCRCInRDRAM();
+    }
+
+    unsigned int newtick=0;
+    static int count = 0;
+    if( options.bSkipFrame )
+    {
+ 	skipping=false;
+	newtick = SDL_GetTicks();
+	if (newtick-oldtick>400 || skipframe>4 || numvi==0) {
+		oldtick=newtick;			// too long frame delay, something must have gone wrong
+		skipping=false;
+	} else
+	if ((float)(newtick-oldtick)>=mspervi*numvi+3.0f) {
+		skipping=true;
+	}
+	// don't jump frameskipping...
+	if (skipping) {
+		//want to skip, be progress slowly...
+		if (skipframe>oldskip+1)
+			skipping = false;
+	}
+	if (skipping) {
+	        skipframe++;
+		status.bScreenIsDrawn = false;
+		TriggerDPInterrupt();
+		TriggerSPInterrupt();
+		return;
+	}
+        oldskip = skipframe;
+        skipframe=0;
+        oldtick=newtick;
+        numvi=0;
     }
 
     g_pOSTask = pTask;
@@ -843,13 +874,11 @@ void DLParser_Process(OSTask * pTask)
             {DebuggerAppendMsg("Start Task without DLIST: ucode=%08X, data=%08X", (uint32)pTask->t.ucode, (uint32)pTask->t.ucode_data);});
 
 
-    // Check if we need to purge (every TEXTURE_TTL milliseconds)
-    if (status.gRDPTime - status.lastPurgeTimeTime > TEXTURE_TTL)
+    // Check if we need to purge (every 5 milliseconds)
+    if (status.gRDPTime - status.lastPurgeTimeTime > 5)
     {
-		Profile_start("Purge Textures");
         gTextureManager.PurgeOldTextures();
         status.lastPurgeTimeTime = status.gRDPTime;
-		Profile_end();
     }
 
     status.dwNumDListsCulled = 0;
@@ -860,31 +889,21 @@ void DLParser_Process(OSTask * pTask)
 
     if( g_curRomInfo.bForceScreenClear && CGraphicsContext::needCleanScene )
     {
-		Profile_start("CRender::g_pRender->ClearBuffer(true,true)");
         CRender::g_pRender->ClearBuffer(true,true);
         CGraphicsContext::needCleanScene = false;
-		Profile_end();
     }
-	
-	Profile_start("SetVIScales()");
+
     SetVIScales();
-	Profile_end();
-	
-	Profile_start("CRender::g_pRender->RenderReset()...");
     CRender::g_pRender->RenderReset();
     CRender::g_pRender->BeginRendering();
     CRender::g_pRender->SetViewport(0, 0, windowSetting.uViWidth, windowSetting.uViHeight, 0x3FF);
     CRender::g_pRender->SetFillMode(options.bWinFrameMode? RICE_FILLMODE_WINFRAME : RICE_FILLMODE_SOLID);
-	Profile_end();
 
-	Profile_start("The main loop");
-    unsigned int i = 0;    
-	try
+    try
     {
         // The main loop
         while( gDlistStackPointer >= 0 )
         {
-			i++;
 #ifdef DEBUGGER
             DEBUGGER_PAUSE_COUNT_N(NEXT_UCODE);
             if( debuggerPause )
@@ -908,24 +927,22 @@ void DLParser_Process(OSTask * pTask)
                 gDlistStack[gDlistStackPointer].pc, pgfx->words.w0, pgfx->words.w1, (gRSP.ucode!=5&&gRSP.ucode!=10)?ucodeNames_GBI1[(pgfx->words.w0>>24)]:ucodeNames_GBI2[(pgfx->words.w0>>24)]);
 #endif
             gDlistStack[gDlistStackPointer].pc += 8;
+            currentUcodeMap[pgfx->words.w0 >>24](pgfx);
 
-			//Profile_start("currentUcodeMap[]");            
-			currentUcodeMap[pgfx->words.w0 >>24](pgfx);
-			//Profile_end2((pgfx->words.w0 >>24), gDlistStackPointer);
-            
-			if ( gDlistStackPointer >= 0 && --gDlistStack[gDlistStackPointer].countdown < 0 )
+            if ( gDlistStackPointer >= 0 && --gDlistStack[gDlistStackPointer].countdown < 0 )
             {
                 LOG_UCODE("**EndDLInMem");
                 gDlistStackPointer--;
             }
         }
+
     }
     catch(...)
     {
         TRACE0("Unknown exception happens in ProcessDList");
         TriggerDPInterrupt();
     }
-	Profile_end1(i);
+
     CRender::g_pRender->EndRendering();
 
     if( gRSP.ucode >= 17)
@@ -1661,8 +1678,8 @@ void RDP_DLParser_Process(void)
     gDlistStack[gDlistStackPointer].pc = start;
     gDlistStack[gDlistStackPointer].countdown = MAX_DL_COUNT;
 
-    // Check if we need to purge (every TEXTURE_TTL milliseconds)
-    if (status.gRDPTime - status.lastPurgeTimeTime > TEXTURE_TTL)
+    // Check if we need to purge (every 5 milliseconds)
+    if (status.gRDPTime - status.lastPurgeTimeTime > 5)
     {
         gTextureManager.PurgeOldTextures();
         status.lastPurgeTimeTime = status.gRDPTime;

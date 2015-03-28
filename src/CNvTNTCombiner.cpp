@@ -15,13 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
-//#include <GLES2/gl2.h>
-#include <GL/gl.h>
 
-typedef double GLdouble;
-
-#include <GL/glext.h>
-#include <EGL/egl.h>
+#include <SDL_opengl.h>
 
 #include "CNvTNTCombiner.h"
 

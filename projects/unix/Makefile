@@ -111,6 +111,10 @@ ifneq ("$(filter arm%,$(HOST_CPU))","")
     CPU := ARM
     ARCH_DETECTED := 32BITS
     PIC ?= 1
+    NO_ASM := 1
+    CFLAGS += -fsigned-char -ffast-math
+    //CFLAGS += -DANDROID
+    CFLAGS += -DPAULSCODE 
     $(warning Architecture "$(HOST_CPU)" not officially supported.')
   endif
 endif
@@ -126,8 +130,8 @@ CXXFLAGS += -fvisibility-inlines-hidden -DSDL_VIDEO_OPENGL_ES2=1 -DSDL_VIDEO_OPE
 LDFLAGS += $(SHARED)
 
 ifeq ($(VC), 1)
-  CFLAGS += -DARM -I/opt/vc/include -I/opt/vc/include/interface/vcos/pthreads -I/opt/vc/include/interface/vmcs_host/linux
-  CXXFLAGS += -I/opt/vc/include -I/opt/vc/include/interface/vcos/pthreads -I/opt/vc/include/interface/vmcs_host/linux
+  CFLAGS += -DARM -I/opt/vc/include -I/opt/vc/include/interface/vcos/pthreads -I/opt/vc/include/interface/vmcs_host/linux -DVC
+  CXXFLAGS += -I/opt/vc/include -I/opt/vc/include/interface/vcos/pthreads -I/opt/vc/include/interface/vmcs_host/linux -DVC
   LDLIBS += -lm -L/opt/vc/lib -lEGL -lbcm_host
 endif
 
@@ -135,6 +139,9 @@ LDLIBS += -lGLESv2
 
 ifeq ($(CPU), X86)
   CFLAGS += -msse
+endif
+ifeq ($(NO_ASM), 1)
+  CFLAGS += -DNO_ASM
 endif
 
 # Since we are building a shared library, we must compile with -fPIC on some architectures
@@ -317,52 +324,47 @@ OBJDIR = _obj$(POSTFIX)
 
 # list of source files to compile
 SOURCE = \
-	$(SRCDIR)/liblinux/BMGImage.c \
-	$(SRCDIR)/liblinux/BMGUtils.cpp \
-	$(SRCDIR)/liblinux/bmp.c \
-	$(SRCDIR)/liblinux/pngrw.c \
-	$(SRCDIR)/Blender.cpp \
-	$(SRCDIR)/Combiner.cpp \
-	$(SRCDIR)/CombinerTable.cpp \
-	$(SRCDIR)/Config.cpp \
-	$(SRCDIR)/ConvertImage.cpp \
-	$(SRCDIR)/ConvertImage16.cpp \
-	$(SRCDIR)/CNvTNTCombiner.cpp \
-	$(SRCDIR)/Debugger.cpp \
-	$(SRCDIR)/DecodedMux.cpp \
-	$(SRCDIR)/DirectXDecodedMux.cpp \
-	$(SRCDIR)/DeviceBuilder.cpp \
-	$(SRCDIR)/FrameBuffer.cpp \
-	$(SRCDIR)/GeneralCombiner.cpp \
-	$(SRCDIR)/GraphicsContext.cpp \
-	$(SRCDIR)/OGLCombiner.cpp \
-	$(SRCDIR)/OGLCombinerNV.cpp \
-	$(SRCDIR)/OGLCombinerTNT2.cpp \
-	$(SRCDIR)/OGLDecodedMux.cpp \
-	$(SRCDIR)/OGLExtCombiner.cpp \
-	$(SRCDIR)/OGLExtensions.cpp \
-	$(SRCDIR)/OGLExtRender.cpp \
-	$(SRCDIR)/OGLES2FragmentShaders.cpp \
-	$(SRCDIR)/OGLGraphicsContext.cpp \
-	$(SRCDIR)/OGLRender.cpp \
-	$(SRCDIR)/OGLRenderExt.cpp \
-	$(SRCDIR)/OGLTexture.cpp \
-	$(SRCDIR)/OGLstate.cpp \
-	$(SRCDIR)/Render.cpp \
-	$(SRCDIR)/RenderBase.cpp \
-	$(SRCDIR)/RenderExt.cpp \
-	$(SRCDIR)/RenderTexture.cpp \
-	$(SRCDIR)/RSP_Parser.cpp \
-	$(SRCDIR)/RSP_S2DEX.cpp \
-	$(SRCDIR)/Texture.cpp \
-	$(SRCDIR)/TextureFilters.cpp \
-	$(SRCDIR)/TextureFilters_2xsai.cpp \
-	$(SRCDIR)/TextureFilters_hq2x.cpp \
-	$(SRCDIR)/TextureFilters_hq4x.cpp \
-	$(SRCDIR)/TextureManager.cpp \
-	$(SRCDIR)/VectorMath.cpp \
-	$(SRCDIR)/Video.cpp \
-	$(SRCDIR)/Profiler.c
+    $(SRCDIR)/Blender.cpp               \
+    $(SRCDIR)/Combiner.cpp              \
+    $(SRCDIR)/CombinerTable.cpp         \
+    $(SRCDIR)/Config.cpp                \
+    $(SRCDIR)/ConvertImage.cpp          \
+    $(SRCDIR)/ConvertImage16.cpp        \
+    $(SRCDIR)/Debugger.cpp              \
+    $(SRCDIR)/DecodedMux.cpp            \
+    $(SRCDIR)/DeviceBuilder.cpp         \
+    $(SRCDIR)/DirectXDecodedMux.cpp     \
+    $(SRCDIR)/FrameBuffer.cpp           \
+    $(SRCDIR)/GeneralCombiner.cpp       \
+    $(SRCDIR)/GraphicsContext.cpp       \
+    $(SRCDIR)/OGLCombiner.cpp           \
+    $(SRCDIR)/OGLDecodedMux.cpp         \
+    $(SRCDIR)/OGLExtCombiner.cpp        \
+    $(SRCDIR)/OGLExtRender.cpp          \
+    $(SRCDIR)/OGLES2FragmentShaders.cpp \
+    $(SRCDIR)/OGLGraphicsContext.cpp    \
+    $(SRCDIR)/OGLRender.cpp             \
+    $(SRCDIR)/OGLRenderExt.cpp          \
+    $(SRCDIR)/OGLTexture.cpp            \
+    $(SRCDIR)/Render.cpp                \
+    $(SRCDIR)/RenderBase.cpp            \
+    $(SRCDIR)/RenderBase_neon.S         \
+    $(SRCDIR)/RenderExt.cpp             \
+    $(SRCDIR)/RenderTexture.cpp         \
+    $(SRCDIR)/RSP_Parser.cpp            \
+    $(SRCDIR)/RSP_S2DEX.cpp             \
+    $(SRCDIR)/Texture.cpp               \
+    $(SRCDIR)/TextureFilters.cpp        \
+    $(SRCDIR)/TextureFilters_2xsai.cpp  \
+    $(SRCDIR)/TextureFilters_hq2x.cpp   \
+    $(SRCDIR)/TextureFilters_hq4x.cpp   \
+    $(SRCDIR)/TextureManager.cpp        \
+    $(SRCDIR)/VectorMath.cpp            \
+    $(SRCDIR)/Video.cpp                 \
+    $(SRCDIR)/liblinux/BMGImage.c       \
+    $(SRCDIR)/liblinux/BMGUtils.c       \
+    $(SRCDIR)/liblinux/bmp.c            \
+    $(SRCDIR)/liblinux/pngrw.c          \
 	
 ifeq ($(OS),MINGW)
 SOURCE += \
@@ -377,6 +379,7 @@ endif
 # generate a list of object files build, make a temporary directory for them
 OBJECTS := $(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(filter %.c, $(SOURCE)))
 OBJECTS += $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(filter %.cpp, $(SOURCE)))
+OBJECTS += $(patsubst $(SRCDIR)/%.S, $(OBJDIR)/%.o, $(filter %.S, $(SOURCE)))
 OBJDIRS = $(dir $(OBJECTS))
 $(shell $(MKDIR) $(OBJDIRS))
 
@@ -435,6 +438,9 @@ CXXFLAGS += $(CFLAGS)
 
 # standard build rules
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+
+$(OBJDIR)/%.o: $(SRCDIR)/%.S
 	$(COMPILE.c) -o $@ $<
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp

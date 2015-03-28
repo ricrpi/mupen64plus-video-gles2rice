@@ -24,7 +24,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "osal_opengl.h"
 
-
 #define M64P_PLUGIN_PROTOTYPES 1
 #include "m64p_types.h"
 #include "m64p_common.h"
@@ -43,8 +42,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "Video.h"
 #include "version.h"
 
-#include "Profiler.h"
-
 //=======================================================
 // local variables
 
@@ -57,7 +54,7 @@ static int l_PluginInit = 0;
 
 PluginStatus  status;
 GFX_INFO      g_GraphicsInfo;
-//CCritSect     g_CritialSection;
+CCritSect     g_CritialSection;
 
 unsigned int   g_dwRamSize = 0x400000;
 unsigned int  *g_pRDRAMu32 = NULL;
@@ -74,7 +71,6 @@ void (*renderCallback)(int) = NULL;
 
 /* definitions of pointers to Core config functions */
 ptr_ConfigOpenSection      ConfigOpenSection = NULL;
-ptr_ConfigSaveSection      ConfigSaveSection 	= NULL;
 ptr_ConfigSetParameter     ConfigSetParameter = NULL;
 ptr_ConfigGetParameter     ConfigGetParameter = NULL;
 ptr_ConfigGetParameterHelp ConfigGetParameterHelp = NULL;
@@ -105,6 +101,11 @@ ptr_VidExt_GL_SetAttribute       CoreVideo_GL_SetAttribute = NULL;
 ptr_VidExt_GL_GetAttribute       CoreVideo_GL_GetAttribute = NULL;
 ptr_VidExt_GL_SwapBuffers        CoreVideo_GL_SwapBuffers = NULL;
 
+// For Fameskip
+float mspervi = 1000.0f/60.0f;	//default is shortest frame
+float numvi = 0.0f;
+bool skipping = false;
+
 //---------------------------------------------------------------------------------------
 // Forward function declarations
 
@@ -116,7 +117,7 @@ static void ChangeWindowStep2()
 {
     status.bDisableFPS = true;
     windowSetting.bDisplayFullscreen = !windowSetting.bDisplayFullscreen;
-    //g_CritialSection.Lock();
+    g_CritialSection.Lock();
     windowSetting.bDisplayFullscreen = CGraphicsContext::Get()->ToggleFullscreen();
 
     CGraphicsContext::Get()->Clear(CLEAR_COLOR_AND_DEPTH_BUFFER);
@@ -125,14 +126,14 @@ static void ChangeWindowStep2()
     CGraphicsContext::Get()->UpdateFrame();
     CGraphicsContext::Get()->Clear(CLEAR_COLOR_AND_DEPTH_BUFFER);
     CGraphicsContext::Get()->UpdateFrame();
-    //g_CritialSection.Unlock();
+    g_CritialSection.Unlock();
     status.bDisableFPS = false;
     status.ToToggleFullScreen = FALSE;
 }
 
 static void ResizeStep2(void)
 {
-    //g_CritialSection.Lock();
+    g_CritialSection.Lock();
 
     // Delete all OpenGL textures
     gTextureManager.CleanUp();
@@ -155,7 +156,7 @@ static void ResizeStep2(void)
         DLParser_Init();
     }
 
-    //g_CritialSection.Unlock();
+    g_CritialSection.Unlock();
     status.ToResize = false;
 }
 
@@ -174,24 +175,32 @@ static void UpdateScreenStep2 (void)
         return;
     }
 
-    //g_CritialSection.Lock();
+    g_CritialSection.Lock();
+
+    //framskip, count vi
+    numvi++;
+
     if( status.bHandleN64RenderTexture )
         g_pFrameBufferManager->CloseRenderTexture(true);
+
+    if (skipping) {
+        g_CritialSection.Unlock();
+        return;
+    }
     
     g_pFrameBufferManager->SetAddrBeDisplayed(*g_GraphicsInfo.VI_ORIGIN_REG);
 
-	if( status.gDlistCount == 0 )
+    if(status.gDlistCount == 0)
     {
-		uint32 width = *g_GraphicsInfo.VI_WIDTH_REG;
-		// CPU frame buffer update
-        
-        if( ((*g_GraphicsInfo.VI_ORIGIN_REG & (g_dwRamSize-1) ) > width*2) && (*g_GraphicsInfo.VI_H_START_REG != 0) && (width != 0) )
+        // CPU frame buffer update
+        uint32 width = *g_GraphicsInfo.VI_WIDTH_REG;
+        if( (*g_GraphicsInfo.VI_ORIGIN_REG & (g_dwRamSize-1) ) > width*2 && *g_GraphicsInfo.VI_H_START_REG != 0 && width != 0 )
         {
             SetVIScales();
             CRender::GetRender()->DrawFrameBuffer(true);
             CGraphicsContext::Get()->UpdateFrame();
         }
-        //g_CritialSection.Unlock();
+        g_CritialSection.Unlock();
         return;
     }
 
@@ -204,7 +213,7 @@ static void UpdateScreenStep2 (void)
         DEBUGGER_IF_DUMP( pauseAtNext, TRACE1("Update Screen: VIORIG=%08X", *g_GraphicsInfo.VI_ORIGIN_REG));
         DEBUGGER_PAUSE_COUNT_N_WITHOUT_UPDATE(NEXT_FRAME);
         DEBUGGER_PAUSE_COUNT_N_WITHOUT_UPDATE(NEXT_SET_CIMG);
-        //g_CritialSection.Unlock();
+        g_CritialSection.Unlock();
         return;
     }
 
@@ -224,7 +233,7 @@ static void UpdateScreenStep2 (void)
 
         DEBUGGER_PAUSE_COUNT_N_WITHOUT_UPDATE(NEXT_FRAME);
         DEBUGGER_PAUSE_COUNT_N_WITHOUT_UPDATE(NEXT_SET_CIMG);
-        //g_CritialSection.Unlock();
+        g_CritialSection.Unlock();
         return;
     }
 
@@ -238,6 +247,7 @@ static void UpdateScreenStep2 (void)
                 status.curDisplayBuffer = *g_GraphicsInfo.VI_ORIGIN_REG;
                 status.curVIOriginReg = status.curDisplayBuffer;
                 //status.curRenderBuffer = NULL;
+
                 CGraphicsContext::Get()->UpdateFrame();
                 DEBUGGER_IF_DUMP( pauseAtNext, TRACE1("Update Screen: VIORIG=%08X", *g_GraphicsInfo.VI_ORIGIN_REG));
                 DEBUGGER_PAUSE_COUNT_N_WITHOUT_UPDATE(NEXT_FRAME);
@@ -255,7 +265,7 @@ static void UpdateScreenStep2 (void)
             DEBUGGER_PAUSE_AND_DUMP_NO_UPDATE(NEXT_FRAME, {DebuggerAppendMsg("Skip Screen Update, the same VIORIG=%08X", *g_GraphicsInfo.VI_ORIGIN_REG);});
         }
 
-        //g_CritialSection.Unlock();
+        g_CritialSection.Unlock();
         return;
     }
 
@@ -263,7 +273,7 @@ static void UpdateScreenStep2 (void)
     {
         status.bVIOriginIsUpdated=true;
         DEBUGGER_PAUSE_AND_DUMP_NO_UPDATE(NEXT_FRAME, {DebuggerAppendMsg("VI ORIG is updated to %08X", *g_GraphicsInfo.VI_ORIGIN_REG);});
-        //g_CritialSection.Unlock();
+        g_CritialSection.Unlock();
         return;
     }
 
@@ -271,21 +281,18 @@ static void UpdateScreenStep2 (void)
     DEBUGGER_PAUSE_COUNT_N_WITHOUT_UPDATE(NEXT_FRAME);
     DEBUGGER_PAUSE_COUNT_N_WITHOUT_UPDATE(NEXT_SET_CIMG);
 
-    //g_CritialSection.Unlock();
+    g_CritialSection.Unlock();
 }
 
 static void ProcessDListStep2(void)
 {
-    //g_CritialSection.Lock();
+    g_CritialSection.Lock();
     if( status.toShowCFB )
-    {	
-		Profile_start("CRender::GetRender()->DrawFrameBuffer(true)");
+    {
         CRender::GetRender()->DrawFrameBuffer(true);
         status.toShowCFB = false;
-		Profile_end();
     }
 
-	Profile_start("DLParser_Process((OSTask *)(g_GraphicsInfo.DMEM + 0x0FC0)");
     try
     {
         DLParser_Process((OSTask *)(g_GraphicsInfo.DMEM + 0x0FC0));
@@ -296,8 +303,8 @@ static void ProcessDListStep2(void)
         TriggerDPInterrupt();
         TriggerSPInterrupt();
     }
-	Profile_end();
-    //g_CritialSection.Unlock();
+
+    g_CritialSection.Unlock();
 }   
 
 static bool StartVideo(void)
@@ -305,7 +312,7 @@ static bool StartVideo(void)
     windowSetting.dps = windowSetting.fps = -1;
     windowSetting.lastSecDlistCount = windowSetting.lastSecFrameCount = 0xFFFFFFFF;
 
-    //g_CritialSection.Lock();
+    g_CritialSection.Lock();
 
     memcpy(&g_curRomInfo.romheader, g_GraphicsInfo.HEADER, sizeof(ROMHeader));
     unsigned char *puc = (unsigned char *) &g_curRomInfo.romheader;
@@ -333,10 +340,13 @@ static bool StartVideo(void)
 
     GenerateCurrentRomOptions();
     status.dwTvSystem = CountryCodeToTVSystem(g_curRomInfo.romheader.nCountryID);
-    if( status.dwTvSystem == TV_SYSTEM_NTSC )
+    if( status.dwTvSystem == TV_SYSTEM_NTSC ) {
         status.fRatio = 0.75f;
-    else
-        status.fRatio = 9/11.0f;;
+	mspervi=1000.0f/60.0f;		//for framskipping
+    } else {
+        status.fRatio = 9/11.0f;
+	mspervi=1000.0f/50.0f;		//for framskipping
+    }
     
     InitExternalTextures();
 
@@ -347,7 +357,7 @@ static bool StartVideo(void)
         bool res = CGraphicsContext::Get()->Initialize(640, 480, !windowSetting.bDisplayFullscreen);
         if (!res)
         {
-            //g_CritialSection.Unlock();
+            g_CritialSection.Unlock();
             return false;
         }
         CDeviceBuilder::GetBuilder()->CreateRender();
@@ -361,13 +371,13 @@ static bool StartVideo(void)
         throw 0;
     }
    
-    //g_CritialSection.Unlock();
+    g_CritialSection.Unlock();
     return true;
 }
 
 static void StopVideo()
 {
-    //g_CritialSection.Lock();
+    g_CritialSection.Lock();
     status.bGameIsRunning = false;
 
     try {
@@ -387,7 +397,7 @@ static void StopVideo()
         TRACE0("Some exceptions during RomClosed");
     }
 
-    //g_CritialSection.Unlock();
+    g_CritialSection.Unlock();
     windowSetting.dps = windowSetting.fps = -1;
     windowSetting.lastSecDlistCount = windowSetting.lastSecFrameCount = 0xFFFFFFFF;
     status.gDlistCount = status.gFrameCount = 0;
@@ -606,23 +616,22 @@ EXPORT m64p_error CALL PluginStartup(m64p_dynlib_handle CoreLibHandle, void *Con
     }
 
     /* Get the core config function pointers from the library handle */
-    ConfigOpenSection = 		(ptr_ConfigOpenSection) 		osal_dynlib_getproc(CoreLibHandle, "ConfigOpenSection");
-	ConfigSaveSection = 		(ptr_ConfigSaveSection) 		osal_dynlib_getproc(CoreLibHandle, "ConfigSaveSection");
-    ConfigSetParameter = 		(ptr_ConfigSetParameter) 		osal_dynlib_getproc(CoreLibHandle, "ConfigSetParameter");
-    ConfigGetParameter = 		(ptr_ConfigGetParameter) 		osal_dynlib_getproc(CoreLibHandle, "ConfigGetParameter");
-    ConfigSetDefaultInt = 		(ptr_ConfigSetDefaultInt) 		osal_dynlib_getproc(CoreLibHandle, "ConfigSetDefaultInt");
-    ConfigSetDefaultFloat = 	(ptr_ConfigSetDefaultFloat) 	osal_dynlib_getproc(CoreLibHandle, "ConfigSetDefaultFloat");
-    ConfigSetDefaultBool = 		(ptr_ConfigSetDefaultBool) 		osal_dynlib_getproc(CoreLibHandle, "ConfigSetDefaultBool");
-    ConfigSetDefaultString = 	(ptr_ConfigSetDefaultString) 	osal_dynlib_getproc(CoreLibHandle, "ConfigSetDefaultString");
-    ConfigGetParamInt = 		(ptr_ConfigGetParamInt) 		osal_dynlib_getproc(CoreLibHandle, "ConfigGetParamInt");
-    ConfigGetParamFloat = 		(ptr_ConfigGetParamFloat) 		osal_dynlib_getproc(CoreLibHandle, "ConfigGetParamFloat");
-    ConfigGetParamBool = 		(ptr_ConfigGetParamBool) 		osal_dynlib_getproc(CoreLibHandle, "ConfigGetParamBool");
-    ConfigGetParamString = 		(ptr_ConfigGetParamString) 		osal_dynlib_getproc(CoreLibHandle, "ConfigGetParamString");
+    ConfigOpenSection = (ptr_ConfigOpenSection) osal_dynlib_getproc(CoreLibHandle, "ConfigOpenSection");
+    ConfigSetParameter = (ptr_ConfigSetParameter) osal_dynlib_getproc(CoreLibHandle, "ConfigSetParameter");
+    ConfigGetParameter = (ptr_ConfigGetParameter) osal_dynlib_getproc(CoreLibHandle, "ConfigGetParameter");
+    ConfigSetDefaultInt = (ptr_ConfigSetDefaultInt) osal_dynlib_getproc(CoreLibHandle, "ConfigSetDefaultInt");
+    ConfigSetDefaultFloat = (ptr_ConfigSetDefaultFloat) osal_dynlib_getproc(CoreLibHandle, "ConfigSetDefaultFloat");
+    ConfigSetDefaultBool = (ptr_ConfigSetDefaultBool) osal_dynlib_getproc(CoreLibHandle, "ConfigSetDefaultBool");
+    ConfigSetDefaultString = (ptr_ConfigSetDefaultString) osal_dynlib_getproc(CoreLibHandle, "ConfigSetDefaultString");
+    ConfigGetParamInt = (ptr_ConfigGetParamInt) osal_dynlib_getproc(CoreLibHandle, "ConfigGetParamInt");
+    ConfigGetParamFloat = (ptr_ConfigGetParamFloat) osal_dynlib_getproc(CoreLibHandle, "ConfigGetParamFloat");
+    ConfigGetParamBool = (ptr_ConfigGetParamBool) osal_dynlib_getproc(CoreLibHandle, "ConfigGetParamBool");
+    ConfigGetParamString = (ptr_ConfigGetParamString) osal_dynlib_getproc(CoreLibHandle, "ConfigGetParamString");
 
-    ConfigGetSharedDataFilepath = 	(ptr_ConfigGetSharedDataFilepath) 	osal_dynlib_getproc(CoreLibHandle, "ConfigGetSharedDataFilepath");
-    ConfigGetUserConfigPath = 		(ptr_ConfigGetUserConfigPath) 		osal_dynlib_getproc(CoreLibHandle, "ConfigGetUserConfigPath");
-    ConfigGetUserDataPath = 		(ptr_ConfigGetUserDataPath) 		osal_dynlib_getproc(CoreLibHandle, "ConfigGetUserDataPath");
-    ConfigGetUserCachePath = 		(ptr_ConfigGetUserCachePath) 		osal_dynlib_getproc(CoreLibHandle, "ConfigGetUserCachePath");
+    ConfigGetSharedDataFilepath = (ptr_ConfigGetSharedDataFilepath) osal_dynlib_getproc(CoreLibHandle, "ConfigGetSharedDataFilepath");
+    ConfigGetUserConfigPath = (ptr_ConfigGetUserConfigPath) osal_dynlib_getproc(CoreLibHandle, "ConfigGetUserConfigPath");
+    ConfigGetUserDataPath = (ptr_ConfigGetUserDataPath) osal_dynlib_getproc(CoreLibHandle, "ConfigGetUserDataPath");
+    ConfigGetUserCachePath = (ptr_ConfigGetUserCachePath) osal_dynlib_getproc(CoreLibHandle, "ConfigGetUserCachePath");
 
     if (!ConfigOpenSection || !ConfigSetParameter || !ConfigGetParameter ||
         !ConfigSetDefaultInt || !ConfigSetDefaultFloat || !ConfigSetDefaultBool || !ConfigSetDefaultString ||
@@ -655,7 +664,6 @@ EXPORT m64p_error CALL PluginStartup(m64p_dynlib_handle CoreLibHandle, void *Con
     }
 
     /* open config section handles and set parameter default values */
-DebugMessage(M64MSG_INFO, "DEBUG Video-Rice InitConfiguration() %d", __LINE__);
     if (!InitConfiguration())
         return M64ERR_INTERNAL;
 
@@ -671,8 +679,6 @@ EXPORT m64p_error CALL PluginShutdown(void)
     if( status.bGameIsRunning )
     {
         RomClosed();
-		Profile_close();
-		
     }
     if (bIniIsChanged)
     {
@@ -742,11 +748,11 @@ EXPORT int CALL RomOpen(void)
     /* Read RiceVideoLinux.ini file, set up internal variables by reading values from core configuration API */
     LoadConfiguration();
 
-    //if( //g_CritialSection.IsLocked() )
-    //{
-        //g_CritialSection.Unlock();
-        TRACE0("//g_CritialSection is locked when game is starting, unlock it now.");
-    //}
+    if( g_CritialSection.IsLocked() )
+    {
+        g_CritialSection.Unlock();
+        TRACE0("g_CritialSection is locked when game is starting, unlock it now.");
+    }
     status.bDisableFPS=false;
 
    g_dwRamSize = 0x800000;
@@ -769,9 +775,7 @@ EXPORT int CALL RomOpen(void)
 //---------------------------------------------------------------------------------------
 EXPORT void CALL UpdateScreen(void)
 {
-	static bool update= true;
-	Profile_start("UpdateScreen");
-	if(options.bShowFPS)
+    if(options.bShowFPS)
     {
         static unsigned int lastTick=0;
         static int frames=0;
@@ -781,40 +785,31 @@ EXPORT void CALL UpdateScreen(void)
         {
             char caption[200];
             sprintf(caption, "%s v%i.%i.%i - %.3f VI/S", PLUGIN_NAME, VERSION_PRINTF_SPLIT(PLUGIN_VERSION), frames/5.0);
-            DebugMessage(M64MSG_INFO, "%s", caption);
-			CoreVideo_SetCaption(caption);
+            CoreVideo_SetCaption(caption);
             frames = 0;
             lastTick = nowTick;
         }
     }
-
-	if (!options.bSkipUpdate || update) UpdateScreenStep2();
-	update = !update;
-	
-	Profile_end();
+    UpdateScreenStep2();
 }
 
 //---------------------------------------------------------------------------------------
 
 EXPORT void CALL ViStatusChanged(void)
 {
-	Profile_start("ViStatusChanged");
-    //g_CritialSection.Lock();
+    g_CritialSection.Lock();
     SetVIScales();
     CRender::g_pRender->UpdateClipRectangle();
-    //g_CritialSection.Unlock();
-	Profile_end();
+    g_CritialSection.Unlock();
 }
 
 //---------------------------------------------------------------------------------------
 EXPORT void CALL ViWidthChanged(void)
 {
-	Profile_start("ViWidthChanged");
-    //g_CritialSection.Lock();
+    g_CritialSection.Lock();
     SetVIScales();
     CRender::g_pRender->UpdateClipRectangle();
-    //g_CritialSection.Unlock();
-	Profile_end();
+    g_CritialSection.Unlock();
 }
 
 EXPORT int CALL InitiateGFX(GFX_INFO Gfx_Info)
@@ -832,7 +827,6 @@ EXPORT int CALL InitiateGFX(GFX_INFO Gfx_Info)
     status.ToResize = false;
     status.bDisableFPS=false;
 
-	DebugMessage(M64MSG_INFO, "DEBUG Video-Rice InitConfiguration() %d", __LINE__);
     if (!InitConfiguration())
     {
         DebugMessage(M64MSG_ERROR, "Failed to read configuration data");
@@ -857,7 +851,6 @@ EXPORT void CALL ResizeVideoOutput(int width, int height)
 
 EXPORT void CALL ProcessRDPList(void)
 {
-	Profile_start("ProcessRDPList");
     try
     {
         RDP_DLParser_Process();
@@ -868,14 +861,11 @@ EXPORT void CALL ProcessRDPList(void)
         TriggerDPInterrupt();
         TriggerSPInterrupt();
     }
-	Profile_end();
 }   
 
 EXPORT void CALL ProcessDList(void)
 {
-	Profile_start("ProcessDList");
     ProcessDListStep2();
-	Profile_end();
 }   
 
 //---------------------------------------------------------------------------------------
@@ -901,9 +891,7 @@ EXPORT void CALL ProcessDList(void)
 
 EXPORT void CALL FBRead(uint32 addr)
 {
-	Profile_start("FBRead");
     g_pFrameBufferManager->FrameBufferReadByCPU(addr);
-	Profile_end();
 }
 
 
@@ -923,9 +911,7 @@ EXPORT void CALL FBRead(uint32 addr)
 
 EXPORT void CALL FBWrite(uint32 addr, uint32 size)
 {
-	Profile_start("FBWrite");
     g_pFrameBufferManager->FrameBufferWriteByCPU(addr, size);
-	Profile_end();
 }
 
 /************************************************************************
@@ -952,7 +938,6 @@ output:   Values are return in the FrameBufferInfo structure
 
 EXPORT void CALL FBGetFrameBufferInfo(void *p)
 {
-	Profile_start("FBGetFrameBufferInfo");
     FrameBufferInfo * pinfo = (FrameBufferInfo *)p;
     memset(pinfo,0,sizeof(FrameBufferInfo)*6);
 
@@ -985,7 +970,6 @@ EXPORT void CALL FBGetFrameBufferInfo(void *p)
         pinfo[5].size = 2;
         TXTRBUF_DETAIL_DUMP(TRACE3("Protect 0x%08X (%d,%d)", pinfo[5].addr, pinfo[5].width, pinfo[5].height));
     }
-	Profile_end();
 }
 
 // Plugin spec 1.3 functions
@@ -1006,9 +990,17 @@ EXPORT void CALL ReadScreen2(void *dest, int *width, int *height, int bFront)
     if (dest == NULL)
         return;
 
-	// we have to use GL_RGBA on Raspberry pi
-	glReadPixels( 0, 0, windowSetting.uDisplayWidth, windowSetting.uDisplayHeight,
-                 GL_RGBA, GL_UNSIGNED_BYTE, dest );
+#if SDL_VIDEO_OPENGL
+    GLint oldMode;
+    glGetIntegerv( GL_READ_BUFFER, &oldMode );
+    if (bFront)
+        glReadBuffer( GL_FRONT );
+    else
+        glReadBuffer( GL_BACK );
+    glReadPixels( 0, 0, windowSetting.uDisplayWidth, windowSetting.uDisplayHeight,
+                 GL_RGB, GL_UNSIGNED_BYTE, dest );
+    glReadBuffer( oldMode );
+#endif
 }
     
 

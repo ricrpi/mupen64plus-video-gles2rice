@@ -23,9 +23,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <stdlib.h>
 #include "Render.h"
-#include "Profiler.h"
-
-#define NO_ASM
 
 uint32 g_TmemFlag[16];
 void SetTmemFlag(uint32 tmemAddr, uint32 size);
@@ -431,13 +428,6 @@ inline uint32 swapdword( uint32 value )
                :
                );
    return value;
-#elif !defined(NO_ASM)
- 	asm volatile("rev %0, %0" 
-				: "+r"(value)
-				: 
-				: 
-				);
-	return value;
 #else
   return ((value & 0xff000000) >> 24) |
          ((value & 0x00ff0000) >>  8) |
@@ -461,15 +451,7 @@ inline uint16 swapword( uint16 value )
                :
                );
   return value;
-#elif !defined(NO_ASM)
- 	asm volatile("rev16 %0, %0" 
-				: "+r"(value)
-				: 
-				: 
-				);
-	return value;
 #else
-
   return ((value & 0xff00) >> 8) |
          ((value & 0x00ff) << 8);
 #endif
@@ -1791,15 +1773,10 @@ void DLParser_SetTImg(Gfx *gfx)
 
 void DLParser_TexRect(Gfx *gfx)
 {
-	Profile_start("DLParser_TexRect()");
     //Gtexrect *gtextrect = (Gtexrect *)gfx;
 
-    if( !status.bCIBufferIsRendered ) 
-	{
-		Profile_start("g_pFrameBufferManager->ActiveTextureBuffer()");
-		g_pFrameBufferManager->ActiveTextureBuffer();
-		Profile_end();
-	}
+    if( !status.bCIBufferIsRendered ) g_pFrameBufferManager->ActiveTextureBuffer();
+
     status.primitiveType = PRIM_TEXTRECT;
 
     // This command used 128bits, and not 64 bits. This means that we have to look one 
@@ -1934,42 +1911,32 @@ void DLParser_TexRect(Gfx *gfx)
             }
             else
             {
-
                 if( frameBufferOptions.bUpdateCIInfo )
                 {
-					Profile_start("PrepareTextures()");
                     PrepareTextures();
                     TexRectToFrameBuffer_8b(dwXL, dwYL, dwXH, dwYH, t0u0, t0v0, t0u1, t0v1, tileno);
-					Profile_end();
                 }
-				
 
                 if( !status.bDirectWriteIntoRDRAM )
                 {
-					Profile_start("CRender::g_pRender->TexRect");
                     CRender::g_pRender->TexRect(dwXL, dwYL, dwXH, dwYH, fS0, fT0, fDSDX, fDTDY);
-					Profile_end();
+
                     status.dwNumTrisRendered += 2;
                 }
             }
         }
         else
         {
-			Profile_start("CRender::g_pRender->TexRect 2");
             CRender::g_pRender->TexRect(dwXL, dwYL, dwXH, dwYH, fS0, fT0, fDSDX, fDTDY);
             status.bFrameBufferDrawnByTriangles = true;
-			Profile_end();
+
             status.dwNumTrisRendered += 2;
         }
     }
 
     if( status.bHandleN64RenderTexture )    g_pRenderTextureInfo->maxUsedHeight = max(g_pRenderTextureInfo->maxUsedHeight,(int)dwYH);
-	
-	Profile_start("ForceMainTextureIndex(curTile)");
-    ForceMainTextureIndex(curTile);
-	Profile_end();
 
-	Profile_end();
+    ForceMainTextureIndex(curTile);
 }
 
 

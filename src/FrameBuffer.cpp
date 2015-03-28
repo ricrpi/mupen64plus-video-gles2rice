@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "RSP_Parser.h"
 #include "Render.h"
 
-#include <stdio.h>
-
 extern TMEMLoadMapInfo g_tmemLoadAddrMap[0x200];    // Totally 4KB TMEM;
 
 // 0 keeps the most recent CI info
@@ -102,11 +100,6 @@ uint16 ConvertRGBATo555(uint8 r, uint8 g, uint8 b, uint8 a)
 {
     uint8 ar = a>=0x20?1:0;
     return ((r>>3)<<RGBA5551_RedShift) | ((g>>3)<<RGBA5551_GreenShift) | ((b>>3)<<RGBA5551_BlueShift) | ar;//(a>>7);
-}
-
-uint16 ConvertBGRATo555(uint32 color32)
-{
-    return (uint16)((((color32>>3)&0x1F)<<RGBA5551_RedShift) | (((color32>>11)&0x1F)<<RGBA5551_GreenShift) | (((color32>>19)&0x1F)<<RGBA5551_BlueShift) | ((color32>>31)));
 }
 
 uint16 ConvertRGBATo555(uint32 color32)
@@ -552,11 +545,11 @@ void TexRectToN64FrameBuffer_16b(uint32 x0, uint32 y0, uint32 width, uint32 heig
 #define FAST_CRC_MIN_X_INC      2
 #define FAST_CRC_MAX_X_INC      7
 #define FAST_CRC_MAX_Y_INC      3
-extern volatile uint32 dwAsmHeight;
-extern volatile uint32 dwAsmPitch;
-extern volatile uint32 dwAsmdwBytesPerLine;
-extern volatile uint32 dwAsmCRC;
-extern volatile uint8* pAsmStart;
+extern uint32 dwAsmHeight;
+extern uint32 dwAsmPitch;
+extern uint32 dwAsmdwBytesPerLine;
+extern uint32 dwAsmCRC;
+extern uint8* pAsmStart;
 
 uint32 CalculateRDRAMCRC(void *pPhysicalAddress, uint32 left, uint32 top, uint32 width, uint32 height, uint32 size, uint32 pitchInBytes )
 {
@@ -612,15 +605,15 @@ uint32 CalculateRDRAMCRC(void *pPhysicalAddress, uint32 left, uint32 top, uint32
     {
         try
         {
-			dwAsmdwBytesPerLine = ((width<<size)+1)/2;
+            dwAsmdwBytesPerLine = ((width<<size)+1)/2;
 
             pAsmStart = (uint8*)(pPhysicalAddress);
             pAsmStart += (top * pitchInBytes) + (((left<<size)+1)>>1);
 
             dwAsmHeight = height - 1;
             dwAsmPitch = pitchInBytes;
-			
-#if defined(NO_ASM)
+
+#if defined(NO_ASM) && !defined(__arm__)
             uint32 pitch = pitchInBytes>>2;
             uint32* pStart = (uint32*)pPhysicalAddress;
             pStart += (top * pitch) + (((left<<size)+1)>>3);
@@ -645,7 +638,8 @@ uint32 CalculateRDRAMCRC(void *pPhysicalAddress, uint32 left, uint32 top, uint32
                 pAsmStart += dwAsmPitch;
                 y--;
             }
-#elif defined(ARM)
+
+#elif defined(__arm__)
             asm volatile(	".align                        \n"
 							"push {r1, r2, r3, r4, r5}     \n"
                 			"mov r3, %1                    \n" // = pAsmStart
@@ -673,6 +667,136 @@ uint32 CalculateRDRAMCRC(void *pPhysicalAddress, uint32 left, uint32 top, uint32
 				: "r" (pAsmStart),"r" (dwAsmHeight),"r" (dwAsmdwBytesPerLine), "r" (dwAsmPitch)		//input
 				: "cc"		//clobbered status
             );
+
+#elif !defined(__GNUC__) // !defined(NO_ASM)
+            __asm 
+            {
+                push eax
+                push ebx
+                push ecx
+                push edx
+                push esi
+
+                mov ecx, pAsmStart;             // = pStart
+                mov edx, 0                      // The CRC
+                mov eax, dwAsmHeight            // = y
+l2:             mov ebx, dwAsmdwBytesPerLine    // = x
+                sub ebx, 4
+l1:             mov esi, [ecx+ebx]
+                xor esi, ebx
+                rol edx, 4
+                add edx, esi
+                sub ebx, 4
+                jge l1
+                xor esi, eax
+                add edx, esi
+                add ecx, dwAsmPitch
+                dec eax
+                jge l2
+
+                mov dwAsmCRC, edx
+
+                pop esi
+                pop edx
+                pop ecx
+                pop ebx
+                pop eax
+            }
+#elif defined(__x86_64__) // defined(__GNUC__) && !defined(NO_ASM)
+        asm volatile(" xorl          %k2,      %k2           \n"
+                     " movslq        %k4,      %q4           \n"
+                     "0:                                     \n"
+                     " movslq         %3,    %%rbx           \n"
+                     " sub            $4,    %%rbx           \n"
+                     "1:                                     \n"
+                     " movl (%0,%%rbx,1),    %%eax           \n"
+                     " xorl        %%ebx,    %%eax           \n"
+                     " roll           $4,      %k2           \n"
+                     " addl        %%eax,      %k2           \n"
+                     " sub            $4,    %%rbx           \n"
+                     " jge            1b                     \n"
+                     " xorl          %k1,    %%eax           \n"
+                     " addl        %%eax,      %k2           \n"
+                     " add           %q4,       %0           \n"
+                     " decl          %k1                     \n"
+                     " jge            0b                     \n"
+                     : "+r"(pAsmStart), "+r"(dwAsmHeight), "=&r"(dwAsmCRC)
+                     : "m"(dwAsmdwBytesPerLine), "r"(dwAsmPitch)
+                     : "%rbx", "%rax", "memory", "cc"
+                     );
+#elif !defined(__PIC__) // !defined(__x86_64__) && defined(__GNUC__) && !defined(NO_ASM)
+           asm volatile("pusha                        \n"
+                "mov    %[pAsmStart], %%ecx           \n" // = pStart
+                "mov    $0, %%edx                     \n" // The CRC
+                "mov    %[dwAsmHeight], %%eax         \n" // = y
+                "0:                                   \n" //l2:
+                "mov    %[dwAsmdwBytesPerLine], %%ebx \n" // = x
+                "sub    $4, %%ebx                     \n"
+                "1:                                   \n" //l1:
+                "mov    (%%ecx,%%ebx), %%esi          \n"
+                "xor %%ebx, %%esi                     \n"
+                "rol $4, %%edx                        \n"
+                "add %%esi, %%edx                     \n"
+                "sub    $4, %%ebx                     \n"
+                "jge 1b                               \n" //jge l1
+                "xor %%eax, %%esi                     \n"
+                "add %%esi, %%edx                     \n"
+                "add %[dwAsmPitch], %%ecx             \n"
+                "dec %%eax                            \n"
+                "jge 0b                               \n" //jge l2
+                
+                "mov    %%edx, %[dwAsmCRC]            \n"
+                "popa                                 \n"
+                : [pAsmStart]"+m"(pAsmStart), [dwAsmHeight]"+m"(dwAsmHeight), [dwAsmCRC]"=m"(dwAsmCRC)
+                : [dwAsmdwBytesPerLine]"m"(dwAsmdwBytesPerLine), [dwAsmPitch]"m"(dwAsmPitch)
+                : "memory", "cc"
+                );
+#else // defined(__PIC__) && !defined(__x86_64__) && defined(__GNUC__) && !defined(NO_ASM)
+           unsigned int saveEBX;
+           unsigned int saveEAX;
+           unsigned int saveECX;
+           unsigned int saveEDX;
+           unsigned int saveESI;
+           unsigned int asmdwBytesPerLine = dwAsmdwBytesPerLine;
+           unsigned int asmPitch = dwAsmPitch;
+           unsigned int asmHeight = dwAsmHeight;
+           unsigned int asmCRC;
+           asm volatile("mov    %%ebx, %2                  \n"
+                "mov    %%eax, %5                  \n"
+                "mov    %%ecx, %7                  \n"
+                "mov    %%edx, %8                  \n"
+                "mov    %%esi, %9                  \n"
+                "mov    %0, %%ecx                  \n" // = pStart
+                "mov    $0, %%edx                  \n" // The CRC
+                "mov    %1, %%eax                  \n" // = y
+                "0:                                \n" //l2:
+                "mov    %3, %%ebx                  \n" // = x
+                "sub    $4, %%ebx                  \n"
+                "1:                                \n" //l1:
+                "mov    (%%ecx,%%ebx), %%esi       \n"
+                "xor %%ebx, %%esi                  \n"
+                "rol $4, %%edx                     \n"
+                "add %%esi, %%edx                  \n"
+                "sub    $4, %%ebx                  \n"
+                "jge 1b                            \n" //jge l1
+                "xor %%eax, %%esi                  \n"
+                "add %%esi, %%edx                  \n"
+                "add %4, %%ecx                     \n"
+                "dec %%eax                         \n"
+                "jge 0b                            \n" //jge l2
+                
+                "mov    %2, %%ebx                  \n"
+                "mov    %%edx, %6                  \n"
+                "mov    %5, %%eax                  \n"
+                "mov    %7, %%ecx                  \n"
+                "mov    %8, %%edx                  \n"
+                "mov    %9, %%esi                  \n"
+                :
+                : "m"(pAsmStart), "m"(asmHeight), "m"(saveEBX), "m"(asmdwBytesPerLine), "m"(asmPitch), "m"(saveEAX), 
+                "m"(asmCRC), "m"(saveECX), "m"(saveEDX), "m"(saveESI)
+                : "memory", "cc"
+                );
+           dwAsmCRC = asmCRC;
 #endif
         }
         catch(...)
@@ -1819,14 +1943,13 @@ void FrameBufferManager::CopyBufferToRDRAM(uint32 addr, uint32 fmt, uint32 siz, 
                 for( uint32 j=0; j<width; j++ )
                 {
                     // Point
-                    /*uint8 r = pS0[indexes[j]+2];
+                    uint8 r = pS0[indexes[j]+2];
                     uint8 g = pS0[indexes[j]+1];
                     uint8 b = pS0[indexes[j]+0];
                     uint8 a = pS0[indexes[j]+3];
 
                     // Liner
-                    *(pD+(j^1)) = ConvertRGBATo555( r, g, b, a);*/
-					*(pD+(j^1)) = ConvertBGRATo555( (uint32)pS0[indexes[j]] );
+                    *(pD+(j^1)) = ConvertRGBATo555( r, g, b, a);
                 }
             }
         }
@@ -1851,14 +1974,12 @@ void FrameBufferManager::CopyBufferToRDRAM(uint32 addr, uint32 fmt, uint32 siz, 
                 for( uint32 j=0; j<width; j++ )
                 {
                     int pos = 4*(j*bufWidth/width);
-                    /*tempword = ConvertRGBATo555((pS[pos+2]),        // Red
+                    tempword = ConvertRGBATo555((pS[pos+2]),        // Red
                                                 (pS[pos+1]),        // Green
                                                 (pS[pos+0]),        // Blue
-                                                (pS[pos+3]));       // Alpha*/
+                                                (pS[pos+3]));       // Alpha
                     
-					tempword = ConvertBGRATo555((uint32)pS[pos]);
-                    
-					//*pD = CIFindIndex(tempword);
+                    //*pD = CIFindIndex(tempword);
                     *(pD+(j^3)) = RevTlutTable[tempword];
                 }
             }

@@ -22,10 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #if !defined(OGL_EXTENSIONS_H)
 #define OGL_EXTENSIONS_H
 
-#include <GL/gl.h>
-#include <GL/glext.h>
-
-#include <EGL/egl.h>
+#include <SDL_opengl.h>
 
 /* Just call this one function to load up the function pointers. */
 void OGLExtensions_Init(void);

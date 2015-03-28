@@ -20,34 +20,32 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #if !defined(CRITSECT_H)
 #define CRITSECT_H
 
-
-
-#include <pthread.h>
+#include <SDL.h>
 
 class CCritSect
 {
 public:
     CCritSect()
     {
-        pthread_mutex_init(&cs, NULL);
+        cs = SDL_CreateMutex();
         locked = 0;
     }
 
     ~CCritSect()
     {
-         pthread_mutex_destroy (&cs);
+        SDL_DestroyMutex(cs);
     }
 
     void Lock()
     {
-        pthread_mutex_lock (&cs);
+        SDL_LockMutex(cs);
         locked = 1;
     }
 
     void Unlock()
     {
         locked = 0;
-        pthread_mutex_unlock (&cs);
+        SDL_UnlockMutex(cs);
     }
 
     bool IsLocked()
@@ -56,7 +54,7 @@ public:
     }
 
 protected:
-    pthread_mutex_t cs;
+    SDL_mutex *cs;
     int locked;
 };
 
