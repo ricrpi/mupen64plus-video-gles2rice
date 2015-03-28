@@ -467,7 +467,7 @@ static void ReadConfiguration(void)
 			windowSetting.uDisplayX = 80;
 		}*/
 		const float dstRatio = (float)windowSetting.uDisplayHeight / (float)windowSetting.uDisplayWidth;
-    	const float srcRatio = ( config.romPAL ? 9.0f/11.0f : 0.75f );
+    	const float srcRatio = ( 0.75f );
     	int x = 0;
     	int y = 0;
     
@@ -490,8 +490,8 @@ static void ReadConfiguration(void)
     	}
     	// else keep videoWidth/Height 
 
-    	windowSetting.uDisplayX = (width - videoWidth) / 2;
-    	windowSetting.uDisplayY = (height - videoHeight) / 2;
+    	windowSetting.uDisplayX = (width - uDisplayWidth) / 2;
+    	windowSetting.uDisplayY = (height - uDisplayHeight) / 2;
 	}
 #endif
     windowSetting.bVerticalSync = ConfigGetParamBool(l_ConfigVideoGeneral, "VerticalSync");
