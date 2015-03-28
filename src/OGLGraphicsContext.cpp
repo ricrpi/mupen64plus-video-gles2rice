@@ -78,7 +78,7 @@ bool COGLGraphicsContext::Initialize(uint32 dwWidth, uint32 dwHeight, BOOL bWind
     }
 
     int  depthBufferDepth = options.OpenglDepthBufferSetting;
-    int  colorBufferDepth = 16;
+    int  colorBufferDepth = 32;
     int bVerticalSync = windowSetting.bVerticalSync;
     if( options.colorQuality == TEXTURE_FMT_A4R4G4B4 ) colorBufferDepth = 16;
 
