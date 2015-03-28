@@ -481,7 +481,7 @@ static void ReadConfiguration(void)
    		{
    			windowSetting.uDisplayWidth = height / srcRatio;
    			windowSetting.uDisplayHeight = height;
-   			if (uDisplayWidth > width)
+   			if (windowSetting.uDisplayWidth > width)
     		{
     		    windowSetting.uDisplayWidth = width;
     		    windowSetting.uDisplayHeight = width * srcRatio;
