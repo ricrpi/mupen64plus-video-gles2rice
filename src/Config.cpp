@@ -460,7 +460,8 @@ static void ReadConfiguration(void)
 	windowSetting.uDisplayX = 0;
 	windowSetting.uDisplayY = 0;
     windowSetting.bDisplayRatio = ConfigGetParamBool(l_ConfigVideoGeneral, "AspectRatio");
-	if (windowSetting.bDisplayRatio) {
+	if (windowSetting.bDisplayRatio) 
+	{
 		/* Old code for fixed pandora resolution
 		if (windowSetting.uDisplayWidth==800) {
 			windowSetting.uDisplayWidth = 640;	// no strech
@@ -472,26 +473,25 @@ static void ReadConfiguration(void)
     	int y = 0;
     
     	//re-scale width and height on per-rom basis
-    	float width = uDisplayWidth;
-    	float height = uDisplayHeight;
+    	float width = windowSetting.uDisplayWidth;
+    	float height = windowSetting.uDisplayHeight;
    		// Dirty fix to keep aspect
    		// if source and destination aspect ratios are not equal recalculate videoWith/Height
    		if(dstRatio != srcRatio) 
    		{
-   			uDisplayWidth = height / srcRatio;
-   			uDisplayHeight = height;
+   			windowSetting.uDisplayWidth = height / srcRatio;
+   			windowSetting.uDisplayHeight = height;
    			if (uDisplayWidth > width)
-    			{
-    		    	uDisplayWidth = width;
-    		    	uDisplayHeight = width * srcRatio;
-    			}
-        	}
+    		{
+    		    windowSetting.uDisplayWidth = width;
+    		    windowSetting.uDisplayHeight = width * srcRatio;
+    		}
         	// else keep videoWidth/Height 
     	}
     	// else keep videoWidth/Height 
 
-    	windowSetting.uDisplayX = (width - uDisplayWidth) / 2;
-    	windowSetting.uDisplayY = (height - uDisplayHeight) / 2;
+    	windowSetting.uDisplayX = (width - windowSetting.uDisplayWidth) / 2;
+    	windowSetting.uDisplayY = (height - windowSetting.uDisplayHeight) / 2;
 	}
 #endif
     windowSetting.bVerticalSync = ConfigGetParamBool(l_ConfigVideoGeneral, "VerticalSync");
