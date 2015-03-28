@@ -22,8 +22,11 @@
 #if !defined(OSAL_OPENGL_H)
 #define OSAL_OPENGL_H
 
-//#include <SDL_config.h>
-extern "C" { extern int SDL_GetTicks(void); }
+#include <SDL_config.h>
+
+#undef SDL_VIDEO_OPENGL
+#define SDL_VIDEO_OPENGL_ES2 1
+
 
 #if SDL_VIDEO_OPENGL
 #include <SDL_opengl.h>
@@ -36,9 +39,7 @@ extern "C" { extern int SDL_GetTicks(void); }
 
 
 #elif SDL_VIDEO_OPENGL_ES2
-//#include <SDL_opengles2.h>
-#include <GLES2/gl2.h>
-#include <EGL/egl.h>
+#include <SDL_opengles2.h>
 #define GLSL_VERSION "100"
 
 // Extension names
@@ -50,6 +51,7 @@ extern "C" { extern int SDL_GetTicks(void); }
 #define VS_COLOR                            1
 #define VS_TEXCOORD0                        2
 #define VS_TEXCOORD1                        3
+#define VS_FOG                              4
 
 // Constant substitutions
 #define GL_CLAMP                            GL_CLAMP_TO_EDGE

@@ -25,21 +25,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #if SDL_VIDEO_OPENGL
 #include "OGLExtensions.h"
 #endif
-
-#include <GLES2/gl2.h>
-
-#include "Profiler.h"
-
 #include "OGLDebug.h"
 #include "OGLGraphicsContext.h"
 #include "TextureManager.h"
 #include "Video.h"
 #include "version.h"
-
-#include "OGLstate.h"
-#ifdef PAULSCODE
-#include "ae_bridge.h"
-#endif
 
 COGLGraphicsContext::COGLGraphicsContext() :
     m_bSupportMultiTexture(false),
@@ -120,16 +110,14 @@ bool COGLGraphicsContext::Initialize(uint32 dwWidth, uint32 dwHeight, BOOL bWind
             CoreVideo_GL_SetAttribute(M64P_GL_MULTISAMPLESAMPLES, 16);
     }
 
-#ifdef PAULSCODE
-    // Allow user to reduce color depth for performance
-    if( !Android_JNI_UseRGBA8888() )
-        colorBufferDepth = 16;
-#endif
-
     /* Set the video mode */
     m64p_video_mode ScreenMode = bWindowed ? M64VIDEO_WINDOWED : M64VIDEO_FULLSCREEN;
     m64p_video_flags flags = M64VIDEOFLAG_SUPPORT_RESIZING;
+#if 1
+    if (CoreVideo_SetVideoMode(800, windowSetting.uDisplayHeight, colorBufferDepth, ScreenMode, flags) != M64ERR_SUCCESS)
+#else
     if (CoreVideo_SetVideoMode(windowSetting.uDisplayWidth, windowSetting.uDisplayHeight, colorBufferDepth, ScreenMode, flags) != M64ERR_SUCCESS)
+#endif
     {
         DebugMessage(M64MSG_ERROR, "Failed to set %i-bit video mode: %ix%i", colorBufferDepth, (int)windowSetting.uDisplayWidth, (int)windowSetting.uDisplayHeight);
         CoreVideo_Quit();
@@ -137,7 +125,6 @@ bool COGLGraphicsContext::Initialize(uint32 dwWidth, uint32 dwHeight, BOOL bWind
     }
 
     /* check that our opengl attributes were properly set */
-#if 0
     int iActual;
     if (CoreVideo_GL_GetAttribute(M64P_GL_DOUBLEBUFFER, &iActual) == M64ERR_SUCCESS)
         if (iActual != iDOUBLEBUFFER)
@@ -151,7 +138,6 @@ bool COGLGraphicsContext::Initialize(uint32 dwWidth, uint32 dwHeight, BOOL bWind
     if (CoreVideo_GL_GetAttribute(M64P_GL_DEPTH_SIZE, &iActual) == M64ERR_SUCCESS)
         if (iActual != depthBufferDepth)
             DebugMessage(M64MSG_WARNING, "Failed to set GL_DEPTH_SIZE to %i. (it's %i)", depthBufferDepth, iActual);
-#endif
 
 #if SDL_VIDEO_OPENGL
     /* Get function pointers to OpenGL extensions (blame Microsoft Windows for this) */
@@ -270,17 +256,17 @@ void COGLGraphicsContext::InitState(void)
 
     glFrontFace(GL_CCW);
     OPENGL_CHECK_ERRORS;
-    gl_Disable(GL_CULL_FACE);
+    glDisable(GL_CULL_FACE);
     OPENGL_CHECK_ERRORS;
 #if SDL_VIDEO_OPENGL
     glDisable(GL_NORMALIZE);
     OPENGL_CHECK_ERRORS;
 #endif
-	glEnable(GL_DEPTH_TEST);
-    OPENGL_CHECK_ERRORS;
+
     glDepthFunc(GL_LEQUAL);
     OPENGL_CHECK_ERRORS;
-    
+    glEnable(GL_DEPTH_TEST);
+    OPENGL_CHECK_ERRORS;
 
 #if SDL_VIDEO_OPENGL
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
@@ -301,14 +287,14 @@ void COGLGraphicsContext::InitState(void)
     glDepthRange(-1, 1);
 
 #elif SDL_VIDEO_OPENGL_ES2
-glDepthRangef(0.0f, 1.0f); //RJH test
-    //glDepthRangef(0.0f, 1.0f);
+    glDepthRangef(-1.0f, 1.0f);
 #endif
     OPENGL_CHECK_ERRORS;
 }
 
 void COGLGraphicsContext::InitOGLExtension(void)
 {
+#if SDL_VIDEO_OPENGL
     // important extension features, it is very bad not to have these feature
     m_bSupportMultiTexture = IsExtensionSupported(OSAL_GL_ARB_MULTITEXTURE);
     m_bSupportTextureEnvCombine = IsExtensionSupported("GL_EXT_texture_env_combine");
@@ -322,12 +308,15 @@ void COGLGraphicsContext::InitOGLExtension(void)
     m_bSupportRescaleNormal = IsExtensionSupported("GL_EXT_rescale_normal");
     m_bSupportLODBias = IsExtensionSupported("GL_EXT_texture_lod_bias");
     m_bSupportAnisotropicFiltering = IsExtensionSupported("GL_EXT_texture_filter_anisotropic");
-
+#else
+    m_bSupportMultiTexture = true;
+    m_bSupportFogCoord = true;
+    m_bSupportAnisotropicFiltering = true;
+#endif
     // Compute maxAnisotropicFiltering
     m_maxAnisotropicFiltering = 0;
 
-//TODO
-   /* if( m_bSupportAnisotropicFiltering
+    if( m_bSupportAnisotropicFiltering
     && (options.anisotropicFiltering == 2
         || options.anisotropicFiltering == 4
         || options.anisotropicFiltering == 8
@@ -346,8 +335,9 @@ void COGLGraphicsContext::InitOGLExtension(void)
         //check if user want less anisotropy than hardware can do
         if((uint32) m_maxAnisotropicFiltering > options.anisotropicFiltering)
         m_maxAnisotropicFiltering = options.anisotropicFiltering;
-    }*/ 
-/*
+    }
+	
+#if SDL_VIDEO_OPENGL
     // Nvidia only extension features (optional)
     m_bSupportNVRegisterCombiner = IsExtensionSupported("GL_NV_register_combiners");
     m_bSupportTextureMirrorRepeat = IsExtensionSupported("GL_IBM_texture_mirrored_repeat") || IsExtensionSupported("ARB_texture_mirrored_repeat");
@@ -355,8 +345,10 @@ void COGLGraphicsContext::InitOGLExtension(void)
     m_bSupportTextureLOD = IsExtensionSupported("GL_EXT_texture_lod");
     m_bSupportBlendColor = IsExtensionSupported("GL_EXT_blend_color");
     m_bSupportBlendSubtract = IsExtensionSupported("GL_EXT_blend_subtract");
-    m_bSupportNVTextureEnvCombine4 = IsExtensionSupported("GL_NV_texture_env_combine4");*/
-
+    m_bSupportNVTextureEnvCombine4 = IsExtensionSupported("GL_NV_texture_env_combine4");
+#else
+    m_supportTextureMirror = true;
+#endif
 }
 
 bool COGLGraphicsContext::IsExtensionSupported(const char* pExtName)
@@ -414,9 +406,9 @@ void COGLGraphicsContext::UpdateFrame(bool swaponly)
 {
     status.gFrameCount++;
 
-    //glFlush();			//Not required - done during GLSwapBuffers()
-    //OPENGL_CHECK_ERRORS;
-
+    glFlush();
+    OPENGL_CHECK_ERRORS;
+    //glFinish();
     //wglSwapIntervalEXT(0);
 
     /*
@@ -468,14 +460,8 @@ void COGLGraphicsContext::UpdateFrame(bool swaponly)
    if(renderCallback)
        (*renderCallback)(status.bScreenIsDrawn);
 
-
-
-   if (status.bScreenIsDrawn)
-	{ 
-		Profile_start("CoreVideo_GL_SwapBuffers()");		
-		CoreVideo_GL_SwapBuffers();
-		Profile_end();
- 	}  
+   CoreVideo_GL_SwapBuffers();
+   
    /*if(options.bShowFPS)
      {
     static unsigned int lastTick=0;
@@ -491,30 +477,15 @@ void COGLGraphicsContext::UpdateFrame(bool swaponly)
          lastTick = nowTick;
       }
      }*/
-Profile_start("glEnable(GL_DEPTH_TEST)");	
-    glEnable(GL_DEPTH_TEST);
-	OPENGL_CHECK_ERRORS;
-Profile_end();	
 
-	Profile_start("glDepthMask(GL_TRUE)");
-	glDepthMask(GL_TRUE);
+    glDepthMask(GL_TRUE);
     OPENGL_CHECK_ERRORS;
-	Profile_end();
-
-Profile_start("glClearDepth(1.0f)");
     glClearDepth(1.0f);
-	OPENGL_CHECK_ERRORS;	
-	Profile_end();
-
-Profile_start("glClear()");
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     OPENGL_CHECK_ERRORS;
-    Profile_end();
-
-	if( !g_curRomInfo.bForceScreenClear )
+    if( !g_curRomInfo.bForceScreenClear )
     {
-        //glClear(GL_DEPTH_BUFFER_BIT);
-        //OPENGL_CHECK_ERRORS;
+        glClear(GL_DEPTH_BUFFER_BIT);
+        OPENGL_CHECK_ERRORS;
     }
     else
         needCleanScene = true;

@@ -45,6 +45,14 @@ typedef struct {
     GLint FogColorLocation;
     GLint FogMinMaxLocation;
 
+    float PrimColors[4];
+    float EnvColors[4];
+    float PrimLODFrac;
+    float EnvLODFrac;
+    float AlphaRef;
+    float FogColors[4];
+    float FogMin;
+    float FogMax;
 } OGLShaderCombinerSaveType;
 
 
@@ -52,8 +60,20 @@ class COGL_FragmentProgramCombiner : public COGLColorCombiner4
 {
 public:
     bool Initialize(void);
-    float m_AlphaRef;
-    void UpdateFog(bool bEnable);
+    void SetFogState(bool bEnable)
+    {
+        bFogState = bEnable;
+    }
+    void SetAlphaTestState(bool bEnable)
+    {
+        bAlphaTestState = bEnable;
+    }
+    
+    void SetAlphaValue(float alpha)
+    {
+        m_AlphaRef = alpha;
+    }
+
 
 protected:
     friend class OGLDeviceBuilder;
@@ -75,6 +95,14 @@ private:
     int FindCompiledMux();
     virtual void GenerateCombinerSetting(int index);
     virtual void GenerateCombinerSettingConstants(int index);
+    float m_AlphaRef;
+    bool bAlphaTestState;
+    bool bAlphaTestPreviousState;
+    bool bFogState;
+    bool bFogPreviousState;
+
+    void UseProgram(GLuint program);
+    GLuint currentProgram;
 
 #ifdef DEBUGGER
     void DisplaySimpleMuxString(void);

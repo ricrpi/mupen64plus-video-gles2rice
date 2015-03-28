@@ -25,11 +25,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "DeviceBuilder.h"
 #include "FrameBuffer.h"
 #include "Render.h"
-#include "Profiler.h"
 
 #include "liblinux/BMGLibPNG.h"
 
 #include <algorithm>
+
+#define FORCED_ALPHA_REF 100 
 
 extern FiddledVtx * g_pVtxBase;
 CRender * CRender::g_pRender=NULL;
@@ -163,6 +164,9 @@ void CRender::SetProjection(const Matrix & mat, bool bPush, bool bReplace)
         {
             // Load projection matrix
             gRSP.projectionMtxs[gRSP.projectionMtxTop] = mat;
+  
+            if(options.bWideScreenHack)
+                gRSP.projectionMtxs[gRSP.projectionMtxTop]._11 *= WIDESCREEN_SCALE;
         }
         else
         {
@@ -176,10 +180,32 @@ void CRender::SetProjection(const Matrix & mat, bool bPush, bool bReplace)
         {
             // Load projection matrix
             gRSP.projectionMtxs[gRSP.projectionMtxTop] = mat;
+  
+            if(options.bWideScreenHack)
+                gRSP.projectionMtxs[gRSP.projectionMtxTop]._11 *= WIDESCREEN_SCALE;
+  
+            //Hack for Zelda missing Heart (translate on z)
+            if( options.enableHackForGames == HACK_FOR_ZELDA || options.enableHackForGames == HACK_FOR_ZELDA_MM) 
+                gRSP.projectionMtxs[gRSP.projectionMtxTop]._43 += 0.5f;
+  
+            //Hack for Mario kart in widescreen mode
+            if((options.bWideScreenHack) && (options.enableHackForGames == HACK_FOR_MARIO_KART))
+            {
+                //Hack for Background and HUD (translate on x)
+                gRSP.projectionMtxs[gRSP.projectionMtxTop]._41 *= WIDESCREEN_SCALE;
+  
+                //Hack for Background (reduce w component)
+                if(gRSP.projectionMtxs[gRSP.projectionMtxTop]._43 == -1.f)
+                    gRSP.projectionMtxs[gRSP.projectionMtxTop]._44 *= WIDESCREEN_SCALE;
+            }
         }
         else
         {
             gRSP.projectionMtxs[gRSP.projectionMtxTop] = mat * gRSP.projectionMtxs[gRSP.projectionMtxTop];
+
+            //Hack for Mario 64 Background in widescreen mode (reduce w component)
+            if((options.bWideScreenHack) && (options.enableHackForGames == HACK_FOR_SUPER_MARIO_64) && (gRSP.projectionMtxs[gRSP.projectionMtxTop]._43 == -1.f))
+                gRSP.projectionMtxs[gRSP.projectionMtxTop]._44 *= WIDESCREEN_SCALE;
         }
     }
     
@@ -315,8 +341,6 @@ void CRender::SetCombinerAndBlender()
         m_pAlphaBlender->InitBlenderMode();
 
     m_pColorCombiner->InitCombinerMode();
-    
-    ApplyTextureFilter();
 }
 
 void CRender::RenderReset()
@@ -376,10 +400,38 @@ bool CRender::FillRect(int nX0, int nY0, int nX1, int nY1, uint32 dwColor)
     {
         //BOOL m_savedZBufferFlag = gRSP.bZBufferEnabled;   // Save ZBuffer state
         ZBufferEnable( FALSE );
-
-        m_fillRectVtx[0].x = ViewPortTranslatei_x(nX0);
+ 
+        float x0, x1;
+ 
+        if(options.bWideScreenHack)
+        {
+            if((nX0 == 0) && (nX1 > 300))
+            {
+                x0 = ViewPortTranslatei_x(nX0);
+                x1 = ViewPortTranslatei_x(nX1);
+            }
+            else
+        {
+            x0 = (ViewPortTranslatei_x(nX0)*WIDESCREEN_SCALE)+(WIDESCREEN_OFFSET*windowSetting.uDisplayWidth);
+            x1 = (ViewPortTranslatei_x(nX1)*WIDESCREEN_SCALE)+(WIDESCREEN_OFFSET*windowSetting.uDisplayWidth);
+        }
+        }
+        else
+        {
+            x0 = ViewPortTranslatei_x(nX0);
+            x1 = ViewPortTranslatei_x(nX1);
+        }
+ 
+        if((options.bWideScreenHack) && (options.enableHackForGames == HACK_FOR_MARIO_KART) && ((dwColor&0x00FFFFFF) != 0))
+        {
+            x0 = (ViewPortTranslatei_x(nX0)*WIDESCREEN_SCALE)+(WIDESCREEN_OFFSET*windowSetting.uDisplayWidth);
+            x1 = (ViewPortTranslatei_x(nX1)*WIDESCREEN_SCALE)+(WIDESCREEN_OFFSET*windowSetting.uDisplayWidth);
+        }
+ 
+ 
+        m_fillRectVtx[0].x = x0;
         m_fillRectVtx[0].y = ViewPortTranslatei_y(nY0);
-        m_fillRectVtx[1].x = ViewPortTranslatei_x(nX1);
+        m_fillRectVtx[1].x = x1;
         m_fillRectVtx[1].y = ViewPortTranslatei_y(nY1);
 
         SetCombinerAndBlender();
@@ -543,6 +595,20 @@ bool CRender::RemapTextureCoordinate
 
 bool CRender::TexRect(int nX0, int nY0, int nX1, int nY1, float fS0, float fT0, float fScaleS, float fScaleT, bool colorFlag, uint32 diffuseColor)
 {
+    //Hack for zelda menu background
+    if((options.enableHackForGames == HACK_FOR_ZELDA) || (options.enableHackForGames == HACK_FOR_ZELDA_MM))
+    {
+        if((nX0 == 0) && (nX1 == 320) && (((nY1-nY0) == 6) || ((nY1-nY0) == 4)))
+        {
+            unsigned int previous_cycle_type = gRDP.otherMode.cycle_type;
+ 
+            gRDP.otherMode.cycle_type = CYCLE_TYPE_FILL;
+            FillRect(nX0, nY0, nX1, nY1, 0);
+            gRDP.otherMode.cycle_type = previous_cycle_type;
+            return true;
+        }
+    }
+ 
     if( options.enableHackForGames == HACK_FOR_DUKE_NUKEM )
     {
         colorFlag = true;
@@ -551,11 +617,9 @@ bool CRender::TexRect(int nX0, int nY0, int nX1, int nY1, float fS0, float fT0, 
 
     if( status.bVIOriginIsUpdated == true && currentRomOptions.screenUpdateSetting==SCREEN_UPDATE_AT_1ST_PRIMITIVE )
     {
-		Profile_start("CGraphicsContext::Get()->UpdateFrame()");
         status.bVIOriginIsUpdated=false;
         CGraphicsContext::Get()->UpdateFrame();
         DEBUGGER_PAUSE_AND_DUMP_NO_UPDATE(NEXT_SET_CIMG,{DebuggerAppendMsg("Screen Update at 1st textRect");});
-		Profile_end();
     }
 
     if( options.enableHackForGames == HACK_FOR_BANJO_TOOIE )
@@ -578,9 +642,8 @@ bool CRender::TexRect(int nX0, int nY0, int nX1, int nY1, float fS0, float fT0, 
             return true;
         }
     }
-	Profile_start("CGraphicsContext::Get()->UpdateFrame()");
+
     PrepareTextures();
-	Profile_end();
 
     if( status.bHandleN64RenderTexture && g_pRenderTextureInfo->CI_Info.dwSize == TXT_SIZE_8b ) 
     {
@@ -589,9 +652,7 @@ bool CRender::TexRect(int nX0, int nY0, int nX1, int nY1, float fS0, float fT0, 
 
     if( !IsTextureEnabled() &&  gRDP.otherMode.cycle_type  != CYCLE_TYPE_COPY )
     {
-        Profile_start("FillRect() 590");   
-		FillRect(nX0, nY0, nX1, nY1, gRDP.primitiveColor);
-		Profile_end();
+        FillRect(nX0, nY0, nX1, nY1, gRDP.primitiveColor);
         return true;
     }
 
@@ -630,15 +691,13 @@ bool CRender::TexRect(int nX0, int nY0, int nX1, int nY1, float fS0, float fT0, 
 
     // Scale to Actual texture coords
     // The two cases are to handle the oversized textures hack on voodoos
- 	Profile_start("SetCombinerAndBlender()");   
+
     SetCombinerAndBlender();
-    Profile_end();   
+    
 
     if( gRDP.otherMode.cycle_type  >= CYCLE_TYPE_COPY || !gRDP.otherMode.z_cmp )
     {
-		Profile_start("ZBufferEnable(FALSE)");   
         ZBufferEnable(FALSE);
-		Profile_end();
     }
 
     BOOL accurate = currentRomOptions.bAccurateTextureMapping;
@@ -714,23 +773,36 @@ bool CRender::TexRect(int nX0, int nY0, int nX1, int nY1, float fS0, float fT0, 
     else
         //difColor = PostProcessDiffuseColor(0);
         difColor = PostProcessDiffuseColor(gRDP.primitiveColor);
-
-    g_texRectTVtx[0].x = ViewPortTranslatei_x(nX0);
+ 
+    float x0, x1;
+ 
+    if(options.bWideScreenHack)
+    {
+        x0 = (ViewPortTranslatei_x(nX0)*WIDESCREEN_SCALE)+(WIDESCREEN_OFFSET*windowSetting.uDisplayWidth);
+        x1 = (ViewPortTranslatei_x(nX1)*WIDESCREEN_SCALE)+(WIDESCREEN_OFFSET*windowSetting.uDisplayWidth);
+    }
+    else
+    {
+        x0 = ViewPortTranslatei_x(nX0);
+        x1 = ViewPortTranslatei_x(nX1);
+    }
+ 
+    g_texRectTVtx[0].x = x0;
     g_texRectTVtx[0].y = ViewPortTranslatei_y(nY0);
     g_texRectTVtx[0].dcDiffuse = difColor;
     g_texRectTVtx[0].dcSpecular = speColor;
 
-    g_texRectTVtx[1].x = ViewPortTranslatei_x(nX1);
+    g_texRectTVtx[1].x = x1;
     g_texRectTVtx[1].y = ViewPortTranslatei_y(nY0);
     g_texRectTVtx[1].dcDiffuse = difColor;
     g_texRectTVtx[1].dcSpecular = speColor;
 
-    g_texRectTVtx[2].x = ViewPortTranslatei_x(nX1);
+    g_texRectTVtx[2].x = x1;
     g_texRectTVtx[2].y = ViewPortTranslatei_y(nY1);
     g_texRectTVtx[2].dcDiffuse = difColor;
     g_texRectTVtx[2].dcSpecular = speColor;
 
-    g_texRectTVtx[3].x = ViewPortTranslatei_x(nX0);
+    g_texRectTVtx[3].x = x0;
     g_texRectTVtx[3].y = ViewPortTranslatei_y(nY1);
     g_texRectTVtx[3].dcDiffuse = difColor;
     g_texRectTVtx[3].dcSpecular = speColor;
@@ -802,48 +874,28 @@ bool CRender::TexRect(int nX0, int nY0, int nX1, int nY1, float fS0, float fT0, 
     TurnFogOnOff(false);
     if( TileUFlags[gRSP.curTile]==TEXTURE_UV_FLAG_CLAMP && TileVFlags[gRSP.curTile]==TEXTURE_UV_FLAG_CLAMP && options.forceTextureFilter == FORCE_DEFAULT_FILTER )
     {
-		Profile_start("ApplyTextureFilter() 803");
         TextureFilter dwFilter = m_dwMagFilter;
         m_dwMagFilter = m_dwMinFilter = FILTER_LINEAR;
         ApplyTextureFilter();
-		Profile_end();
-		Profile_start("ApplyRDPScissor() 808");
         ApplyRDPScissor();
-		Profile_end();
-		Profile_start("RenderTexRect() 811");
         res = RenderTexRect();
-		Profile_end();
-		Profile_start("ApplyTextureFilter() 814");
         m_dwMagFilter = m_dwMinFilter = dwFilter;
         ApplyTextureFilter();
-		Profile_end();
     }
     else if( fScaleS >= 1 && fScaleT >= 1 && options.forceTextureFilter == FORCE_DEFAULT_FILTER )
     {
-        Profile_start("ApplyTextureFilter() 82");
-		TextureFilter dwFilter = m_dwMagFilter;
+        TextureFilter dwFilter = m_dwMagFilter;
         m_dwMagFilter = m_dwMinFilter = FILTER_POINT;
         ApplyTextureFilter();
-        Profile_end();
-		Profile_start("ApplyRDPScissor() 826");
-		ApplyRDPScissor();
-		Profile_end();
-		Profile_start("RenderTexRect() 829");
+        ApplyRDPScissor();
         res = RenderTexRect();
-		Profile_end();
-		Profile_start("ApplyTextureFilter() 832");
         m_dwMagFilter = m_dwMinFilter = dwFilter;
         ApplyTextureFilter();
-		Profile_end();
     }
     else
     {
-		Profile_start("ApplyRDPScissor(0 839");
         ApplyRDPScissor();
-		Profile_end();
-		Profile_start("RenderTexRect() 842");
         res = RenderTexRect();
-		Profile_end();
     }
     TurnFogOnOff(gRSP.bFogEnabled);
 
@@ -908,23 +960,36 @@ bool CRender::TexRectFlip(int nX0, int nY0, int nX1, int nY1, float fS0, float f
     COLOR speColor = PostProcessSpecularColor();
     COLOR difColor = PostProcessDiffuseColor(gRDP.primitiveColor);
 
-    // Same as TexRect, but with texcoords 0,2 swapped
-    g_texRectTVtx[0].x = ViewPortTranslatei_x(nX0);
+    float x0, x1;
+ 
+    if(options.bWideScreenHack)
+    {
+        x0 = (ViewPortTranslatei_x(nX0)*WIDESCREEN_SCALE)+(WIDESCREEN_OFFSET*windowSetting.uDisplayWidth);
+        x1 = (ViewPortTranslatei_x(nX1)*WIDESCREEN_SCALE)+(WIDESCREEN_OFFSET*windowSetting.uDisplayWidth);
+    }
+    else
+    {
+        x0 = ViewPortTranslatei_x(nX0);
+        x1 = ViewPortTranslatei_x(nX1);
+    }
+
+// Same as TexRect, but with texcoords 0,2 swapped
+    g_texRectTVtx[0].x = x0;
     g_texRectTVtx[0].y = ViewPortTranslatei_y(nY0);
     g_texRectTVtx[0].dcDiffuse = difColor;
     g_texRectTVtx[0].dcSpecular = speColor;
 
-    g_texRectTVtx[1].x = ViewPortTranslatei_x(nX1);
+    g_texRectTVtx[1].x = x1;
     g_texRectTVtx[1].y = ViewPortTranslatei_y(nY0);
     g_texRectTVtx[1].dcDiffuse = difColor;
     g_texRectTVtx[1].dcSpecular = speColor;
 
-    g_texRectTVtx[2].x = ViewPortTranslatei_x(nX1);
+    g_texRectTVtx[2].x = x1;
     g_texRectTVtx[2].y = ViewPortTranslatei_y(nY1);
     g_texRectTVtx[2].dcDiffuse = difColor;
     g_texRectTVtx[2].dcSpecular = speColor;
 
-    g_texRectTVtx[3].x = ViewPortTranslatei_x(nX0);
+    g_texRectTVtx[3].x = x0;
     g_texRectTVtx[3].y = ViewPortTranslatei_y(nY1);
     g_texRectTVtx[3].dcDiffuse = difColor;
     g_texRectTVtx[3].dcSpecular = speColor;
@@ -961,7 +1026,20 @@ bool CRender::TexRectFlip(int nX0, int nY0, int nX1, int nY1, float fS0, float f
 
 void CRender::StartDrawSimple2DTexture(float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1, COLOR dif, COLOR spe, float z, float rhw)
 {
-    g_texRectTVtx[0].x = ViewPortTranslatei_x(x0);  // << Error here, shouldn't divid by 4
+    float nX0, nX1;
+ 
+    if(options.bWideScreenHack)
+    {
+        nX0 = (ViewPortTranslatei_x(x0)*WIDESCREEN_SCALE)+(WIDESCREEN_OFFSET*windowSetting.uDisplayWidth);
+        nX1 = (ViewPortTranslatei_x(x1)*WIDESCREEN_SCALE)+(WIDESCREEN_OFFSET*windowSetting.uDisplayWidth);
+    }
+    else
+    {
+        nX0 = ViewPortTranslatei_x(x0);
+        nX1 = ViewPortTranslatei_x(x1);
+    }
+
+    g_texRectTVtx[0].x = nX0;  // << Error here, shouldn't divid by 4
     g_texRectTVtx[0].y = ViewPortTranslatei_y(y0);
     g_texRectTVtx[0].dcDiffuse = dif;
     g_texRectTVtx[0].dcSpecular = spe;
@@ -969,21 +1047,21 @@ void CRender::StartDrawSimple2DTexture(float x0, float y0, float x1, float y1, f
     g_texRectTVtx[0].tcord[0].v = v0;
 
 
-    g_texRectTVtx[1].x = ViewPortTranslatei_x(x1);
+    g_texRectTVtx[1].x = nX1;
     g_texRectTVtx[1].y = ViewPortTranslatei_y(y0);
     g_texRectTVtx[1].dcDiffuse = dif;
     g_texRectTVtx[1].dcSpecular = spe;
     g_texRectTVtx[1].tcord[0].u = u1;
     g_texRectTVtx[1].tcord[0].v = v0;
 
-    g_texRectTVtx[2].x = ViewPortTranslatei_x(x1);
+    g_texRectTVtx[2].x = nX1;
     g_texRectTVtx[2].y = ViewPortTranslatei_y(y1);
     g_texRectTVtx[2].dcDiffuse = dif;
     g_texRectTVtx[2].dcSpecular = spe;
     g_texRectTVtx[2].tcord[0].u = u1;
     g_texRectTVtx[2].tcord[0].v = v1;
 
-    g_texRectTVtx[3].x = ViewPortTranslatei_x(x0);
+    g_texRectTVtx[3].x = nX0;
     g_texRectTVtx[3].y = ViewPortTranslatei_y(y1);
     g_texRectTVtx[3].dcDiffuse = dif;
     g_texRectTVtx[3].dcSpecular = spe;
@@ -1693,10 +1771,12 @@ void CRender::SaveTextureToFile(int tex, TextureChannel channel, bool bShow)
 #endif
 
 extern RenderTextureInfo gRenderTextureInfos[];
-void SetVertexTextureUVCoord(TexCord &dst, float s, float t, int tile, TxtrCacheEntry *pEntry)
+void SetVertexTextureUVCoord(TexCord &dst, const TexCord &src, int tile, TxtrCacheEntry *pEntry)
 {
     RenderTexture &txtr = g_textures[tile];
     RenderTextureInfo &info = gRenderTextureInfos[pEntry->txtrBufIdx-1];
+    float s = src.u;
+    float t = src.v;
 
     uint32 addrOffset = g_TI.dwAddr-info.CI_Info.dwAddr;
     uint32 extraTop = (addrOffset>>(info.CI_Info.dwSize-1)) /info.CI_Info.dwWidth;
@@ -1716,21 +1796,30 @@ void SetVertexTextureUVCoord(TexCord &dst, float s, float t, int tile, TxtrCache
     dst.v = t;
 }
 
-void CRender::SetVertexTextureUVCoord(TLITVERTEX &v, float fTex0S, float fTex0T)
+void CRender::SetVertexTextureUVCoord(TLITVERTEX &v, const TexCord &fTex0)
 {
     RenderTexture &txtr = g_textures[0];
     if( txtr.pTextureEntry && txtr.pTextureEntry->txtrBufIdx > 0 )
     {
-        ::SetVertexTextureUVCoord(v.tcord[0], fTex0S, fTex0T, 0, txtr.pTextureEntry);
+        ::SetVertexTextureUVCoord(v.tcord[0], fTex0, 0, txtr.pTextureEntry);
     }
     else
     {
-        v.tcord[0].u = fTex0S;
-        v.tcord[0].v = fTex0T;
+        v.tcord[0] = fTex0;
     }
 }
-void CRender::SetVertexTextureUVCoord(TLITVERTEX &v, float fTex0S, float fTex0T, float fTex1S, float fTex1T)
+
+void CRender::SetVertexTextureUVCoord(TLITVERTEX &v, float fTex0S, float fTex0T)
 {
+    TexCord t = { fTex0S, fTex0T };
+    SetVertexTextureUVCoord(v, t);
+}
+
+void CRender::SetVertexTextureUVCoord(TLITVERTEX &v, const TexCord &fTex0_, const TexCord &fTex1_)
+{
+    TexCord fTex0 = fTex0_;
+    TexCord fTex1 = fTex1_;
+
     if( (options.enableHackForGames == HACK_FOR_ZELDA||options.enableHackForGames == HACK_FOR_ZELDA_MM) && m_Mux == 0x00262a60150c937fLL && gRSP.curTile == 0 )
     {
         // Hack for Zelda Sun
@@ -1740,34 +1829,39 @@ void CRender::SetVertexTextureUVCoord(TLITVERTEX &v, float fTex0S, float fTex0T,
             t1.dwFormat == TXT_FMT_I && t1.dwSize == TXT_SIZE_8b && t1.dwWidth == 64 &&
             t0.dwHeight == t1.dwHeight )
         {
-            fTex0S /= 2;
-            fTex0T /= 2;
-            fTex1S /= 2;
-            fTex1T /= 2;
+            fTex0.u /= 2;
+            fTex0.v /= 2;
+            fTex1.u /= 2;
+            fTex1.v /= 2;
         }
     }
 
     RenderTexture &txtr0 = g_textures[0];
     if( txtr0.pTextureEntry && txtr0.pTextureEntry->txtrBufIdx > 0 )
     {
-        ::SetVertexTextureUVCoord(v.tcord[0], fTex0S, fTex0T, 0, txtr0.pTextureEntry);
+        ::SetVertexTextureUVCoord(v.tcord[0], fTex0, 0, txtr0.pTextureEntry);
     }
     else
     {
-        v.tcord[0].u = fTex0S;
-        v.tcord[0].v = fTex0T;
+        v.tcord[0] = fTex0;
     }
 
     RenderTexture &txtr1 = g_textures[1];
     if( txtr1.pTextureEntry && txtr1.pTextureEntry->txtrBufIdx > 0 )
     {
-        ::SetVertexTextureUVCoord(v.tcord[1], fTex1S, fTex1T, 1, txtr1.pTextureEntry);
+        ::SetVertexTextureUVCoord(v.tcord[1], fTex1, 1, txtr1.pTextureEntry);
     }
     else
     {
-        v.tcord[1].u = fTex1S;
-        v.tcord[1].v = fTex1T;
+        v.tcord[1] = fTex1;
     }
+}
+
+void CRender::SetVertexTextureUVCoord(TLITVERTEX &v, float fTex0S, float fTex0T, float fTex1S, float fTex1T)
+{
+    TexCord t0 = { fTex0S, fTex0T };
+    TexCord t1 = { fTex1S, fTex1T };
+    SetVertexTextureUVCoord(v, t0, t1);
 }
 
 void CRender::SetClipRatio(uint32 type, uint32 w1)
@@ -1920,6 +2014,8 @@ void CRender::UpdateScissorWithClipRatio()
 // Set other modes not covered by color combiner or alpha blender
 void CRender::InitOtherModes(void)
 {
+    ApplyTextureFilter();
+
     //
     // I can't think why the hand in mario's menu screen is rendered with an opaque rendermode,
     // and no alpha threshold. We set the alpha reference to 1 to ensure that the transparent pixels
@@ -1929,7 +2025,7 @@ void CRender::InitOtherModes(void)
     {
         if ( gRDP.otherMode.cvg_x_alpha && (gRDP.otherMode.alpha_cvg_sel || gRDP.otherMode.aa_en ) )
         {
-            ForceAlphaRef(128); // Strange, I have to use value=2 for pixel shader combiner for Nvidia FX5200
+            ForceAlphaRef(FORCED_ALPHA_REF); // Strange, I have to use value=2 for pixel shader combiner for Nvidia FX5200
                                 // for other video cards, value=1 is good enough.
             SetAlphaTestEnable(TRUE);
         }
@@ -1953,7 +2049,7 @@ void CRender::InitOtherModes(void)
         else
         {
             // RDP_ALPHA_COMPARE_THRESHOLD || RDP_ALPHA_COMPARE_DITHER
-            if( m_dwAlpha==0 )
+            if( m_dwAlpha==0 || m_dwAlpha==FORCED_ALPHA_REF )
                 ForceAlphaRef(1);
             else
                 ForceAlphaRef(m_dwAlpha);

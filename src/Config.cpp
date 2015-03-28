@@ -35,8 +35,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "TextureManager.h"
 #include "Video.h"
 
-#define NO_ASM
-
 #define INI_FILE        "RiceVideoLinux.ini"
 
 static m64p_handle l_ConfigVideoRice = NULL;
@@ -301,7 +299,7 @@ void GenerateFrameBufferOptions(void)
 
 BOOL InitConfiguration(void)
 {
-	if (ConfigOpenSection("Video-General", &l_ConfigVideoGeneral) != M64ERR_SUCCESS)
+    if (ConfigOpenSection("Video-General", &l_ConfigVideoGeneral) != M64ERR_SUCCESS)
     {
         DebugMessage(M64MSG_ERROR, "Unable to open Video-General configuration section");
         return FALSE;
@@ -312,17 +310,22 @@ BOOL InitConfiguration(void)
         return FALSE;
     }
 
-	DebugMessage(M64MSG_INFO, "DEBUG Video-Rice set default configuration");
-
-    ConfigSetDefaultBool(l_ConfigVideoGeneral, "Fullscreen", FALSE, "Use fullscreen mode if True, or windowed mode if False ");
+    ConfigSetDefaultBool(l_ConfigVideoGeneral, "Fullscreen", 0, "Use fullscreen mode if True, or windowed mode if False ");
     ConfigSetDefaultInt(l_ConfigVideoGeneral, "ScreenWidth", 640, "Width of output window or fullscreen width");
     ConfigSetDefaultInt(l_ConfigVideoGeneral, "ScreenHeight", 480, "Height of output window or fullscreen height");
+#if 1
+    ConfigSetDefaultBool(l_ConfigVideoGeneral, "AspectRatio", 1, "If true, use correct aspect ratio, if false, stretch to fullscreen");
+#endif
     ConfigSetDefaultBool(l_ConfigVideoGeneral, "VerticalSync", 0, "If true, activate the SDL_GL_SWAP_CONTROL attribute");
 
     ConfigSetDefaultInt(l_ConfigVideoRice, "FrameBufferSetting", FRM_BUF_NONE, "Frame Buffer Emulation (0=ROM default, 1=disable)");
     ConfigSetDefaultInt(l_ConfigVideoRice, "FrameBufferWriteBackControl", FRM_BUF_WRITEBACK_NORMAL, "Frequency to write back the frame buffer (0=every frame, 1=every other frame, etc)");
     ConfigSetDefaultInt(l_ConfigVideoRice, "RenderToTexture", TXT_BUF_NONE, "Render-to-texture emulation (0=none, 1=ignore, 2=normal, 3=write back, 4=write back and reload)");
-    ConfigSetDefaultInt(l_ConfigVideoRice, "ScreenUpdateSetting", SCREEN_UPDATE_BEFORE_SCREEN_CLEAR, "Control when the screen will be updated (0=ROM default, 1=VI origin update, 2=VI origin change, 3=CI change, 4=first CI change, 5=first primitive draw, 6=before screen clear, 7=after screen drawn)");  // SCREEN_UPDATE_AT_VI_UPDATE_AND_DRAWN
+#if defined(WIN32)
+    ConfigSetDefaultInt(l_ConfigVideoRice, "ScreenUpdateSetting", SCREEN_UPDATE_AT_1ST_CI_CHANGE, "Control when the screen will be updated (0=ROM default, 1=VI origin update, 2=VI origin change, 3=CI change, 4=first CI change, 5=first primitive draw, 6=before screen clear, 7=after screen drawn)");  // SCREEN_UPDATE_AT_VI_UPDATE_AND_DRAWN
+#else
+    ConfigSetDefaultInt(l_ConfigVideoRice, "ScreenUpdateSetting", SCREEN_UPDATE_AT_VI_UPDATE, "Control when the screen will be updated (0=ROM default, 1=VI origin update, 2=VI origin change, 3=CI change, 4=first CI change, 5=first primitive draw, 6=before screen clear, 7=after screen drawn)");  // SCREEN_UPDATE_AT_VI_UPDATE_AND_DRAWN
+#endif
     ConfigSetDefaultBool(l_ConfigVideoRice, "NormalAlphaBlender", FALSE, "Force to use normal alpha blender");
     ConfigSetDefaultBool(l_ConfigVideoRice, "FastTextureLoading", FALSE, "Use a faster algorithm to speed up texture loading and CRC computation");
     ConfigSetDefaultBool(l_ConfigVideoRice, "AccurateTextureMapping", TRUE, "Use different texture coordinate clamping code");
@@ -335,16 +338,16 @@ BOOL InitConfiguration(void)
     ConfigSetDefaultBool(l_ConfigVideoRice, "WinFrameMode", FALSE, "If enabled, graphics will be drawn in WinFrame mode instead of solid and texture mode");
     ConfigSetDefaultBool(l_ConfigVideoRice, "FullTMEMEmulation", FALSE, "N64 Texture Memory Full Emulation (may fix some games, may break others)");
     ConfigSetDefaultBool(l_ConfigVideoRice, "OpenGLVertexClipper", FALSE, "Enable vertex clipper for fog operations");
-    ConfigSetDefaultBool(l_ConfigVideoRice, "EnableSSE", FALSE, "Enable/Disable SSE optimizations for capable CPUs");
-    ConfigSetDefaultBool(l_ConfigVideoRice, "EnableVertexShader", TRUE, "Use GPU vertex shader");
-    ConfigSetDefaultBool(l_ConfigVideoRice, "SkipFrame", TRUE, "If this option is enabled, the plugin will skip every other frame");
-    ConfigSetDefaultBool(l_ConfigVideoRice, "SkipScreenUpdate", TRUE, "If this option is enabled, the plugin will only draw every other screen update");
+    ConfigSetDefaultBool(l_ConfigVideoRice, "EnableSSE", TRUE, "Enable/Disable SSE optimizations for capable CPUs");
+    ConfigSetDefaultBool(l_ConfigVideoRice, "EnableVertexShader", FALSE, "Use GPU vertex shader");
+    ConfigSetDefaultBool(l_ConfigVideoRice, "SkipFrame", FALSE, "If this option is enabled, the plugin will skip every other frame");
     ConfigSetDefaultBool(l_ConfigVideoRice, "TexRectOnly", FALSE, "If enabled, texture enhancement will be done only for TxtRect ucode");
     ConfigSetDefaultBool(l_ConfigVideoRice, "SmallTextureOnly", FALSE, "If enabled, texture enhancement will be done only for textures width+height<=128");
     ConfigSetDefaultBool(l_ConfigVideoRice, "LoadHiResCRCOnly", TRUE, "Select hi-resolution textures based only on the CRC and ignore format+size information (Glide64 compatibility)");
     ConfigSetDefaultBool(l_ConfigVideoRice, "LoadHiResTextures", FALSE, "Enable hi-resolution texture file loading");
     ConfigSetDefaultBool(l_ConfigVideoRice, "DumpTexturesToFiles", FALSE, "Enable texture dumping");
-    ConfigSetDefaultBool(l_ConfigVideoRice, "ShowFPS", TRUE, "Display On-screen FPS");
+    ConfigSetDefaultBool(l_ConfigVideoRice, "ShowFPS", FALSE, "Display On-screen FPS");
+    ConfigSetDefaultBool(l_ConfigVideoRice, "WideScreenHack", FALSE, "Widescreen hack");
 
     ConfigSetDefaultInt(l_ConfigVideoRice, "Mipmapping", 2, "Use Mipmapping? 0=no, 1=nearest, 2=bilinear, 3=trilinear");
     ConfigSetDefaultInt(l_ConfigVideoRice, "FogMethod", 0, "Enable, Disable or Force fog generation (0=Disable, 1=Enable n64 choose, 2=Force Fog)");
@@ -357,12 +360,7 @@ BOOL InitConfiguration(void)
     ConfigSetDefaultInt(l_ConfigVideoRice, "ColorQuality", TEXTURE_FMT_A8R8G8B8, "Color bit depth for rendering window (0=32 bits, 1=16 bits)");
     ConfigSetDefaultInt(l_ConfigVideoRice, "OpenGLRenderSetting", OGL_DEVICE, "OpenGL level to support (0=auto, 1=OGL_1.1, 2=OGL_1.2, 3=OGL_1.3, 4=OGL_1.4, 5=OGL_1.4_V2, 6=OGL_TNT2, 7=NVIDIA_OGL, 8=OGL_FRAGMENT_PROGRAM)");
     ConfigSetDefaultInt(l_ConfigVideoRice, "AnisotropicFiltering", 0, "Enable/Disable Anisotropic Filtering for Mipmapping (0=no filtering, 2-16=quality). This is uneffective if Mipmapping is 0. If the given value is to high to be supported by your graphic card, the value will be the highest value your graphic card can support. Better result with Trilinear filtering");
-
-	
-	ConfigSaveSection("Video-General");
-	ConfigSaveSection("Video-Rice");    
-	
-return TRUE;
+    return TRUE;
 }
 
 bool isMMXSupported() 
@@ -435,6 +433,18 @@ static void ReadConfiguration(void)
 {
     windowSetting.bDisplayFullscreen = ConfigGetParamBool(l_ConfigVideoGeneral, "Fullscreen");
     windowSetting.uDisplayWidth = ConfigGetParamInt(l_ConfigVideoGeneral, "ScreenWidth");
+#if 1
+	windowSetting.bDisplayRatio = true;
+	windowSetting.uDisplayX = 0;
+	windowSetting.uDisplayY = 0;
+    windowSetting.bDisplayRatio = ConfigGetParamBool(l_ConfigVideoGeneral, "AspectRatio");
+	if (windowSetting.bDisplayRatio) {
+		if (windowSetting.uDisplayWidth==800) {
+			windowSetting.uDisplayWidth = 640;	// no strech
+			windowSetting.uDisplayX = 80;
+		}
+	}
+#endif
     windowSetting.uDisplayHeight = ConfigGetParamInt(l_ConfigVideoGeneral, "ScreenHeight");
     windowSetting.bVerticalSync = ConfigGetParamBool(l_ConfigVideoGeneral, "VerticalSync");
 
@@ -458,15 +468,17 @@ static void ReadConfiguration(void)
     options.bEnableSSE = ConfigGetParamBool(l_ConfigVideoRice, "EnableSSE");
     options.bEnableVertexShader = ConfigGetParamBool(l_ConfigVideoRice, "EnableVertexShader");
     options.bSkipFrame = ConfigGetParamBool(l_ConfigVideoRice, "SkipFrame");
-	options.bSkipUpdate = ConfigGetParamBool(l_ConfigVideoRice, "SkipScreenUpdate");
     options.bTexRectOnly = ConfigGetParamBool(l_ConfigVideoRice, "TexRectOnly");
     options.bSmallTextureOnly = ConfigGetParamBool(l_ConfigVideoRice, "SmallTextureOnly");
     options.bLoadHiResTextures = ConfigGetParamBool(l_ConfigVideoRice, "LoadHiResTextures");
     options.bLoadHiResCRCOnly = ConfigGetParamBool(l_ConfigVideoRice, "LoadHiResCRCOnly");
     options.bDumpTexturesToFiles = ConfigGetParamBool(l_ConfigVideoRice, "DumpTexturesToFiles");
     options.bShowFPS = ConfigGetParamBool(l_ConfigVideoRice, "ShowFPS");
+    options.bWideScreenHack = ConfigGetParamBool(l_ConfigVideoRice, "WideScreenHack");
 
     options.mipmapping = ConfigGetParamInt(l_ConfigVideoRice, "Mipmapping");
+	//*SEB* Force to 0 has other setting crash on the Pandora
+	options.mipmapping = TEXTURE_NO_MIPMAP;
     options.fogMethod = ConfigGetParamInt(l_ConfigVideoRice, "FogMethod");
     options.forceTextureFilter = ConfigGetParamInt(l_ConfigVideoRice, "ForceTextureFilter");
     options.textureEnhancement = ConfigGetParamInt(l_ConfigVideoRice, "TextureEnhancement");
@@ -477,7 +489,9 @@ static void ReadConfiguration(void)
     options.colorQuality = ConfigGetParamInt(l_ConfigVideoRice, "ColorQuality");
     options.OpenglRenderSetting = ConfigGetParamInt(l_ConfigVideoRice, "OpenGLRenderSetting");
     options.anisotropicFiltering = ConfigGetParamInt(l_ConfigVideoRice, "AnisotropicFiltering");
-
+	//*SEB* Force to 0 has mipmapping is already forced to 0
+	options.anisotropicFiltering = 0;
+	
     CDeviceBuilder::SelectDeviceType((SupportedDeviceType)options.OpenglRenderSetting);
 
     status.isMMXSupported = isMMXSupported();
@@ -577,10 +591,12 @@ void GenerateCurrentRomOptions()
     else if ((strstr((char*)g_curRomInfo.szGameName, "ZELDA") != 0) && (strstr((char*)g_curRomInfo.szGameName, "MASK") != 0))
     {
         options.enableHackForGames = HACK_FOR_ZELDA_MM;
+        options.bWideScreenHack = true;
     }
     else if ((strstr((char*)g_curRomInfo.szGameName, "ZELDA") != 0))
     {
         options.enableHackForGames = HACK_FOR_ZELDA;
+        options.bWideScreenHack = true;
     }
     else if ((strstr((char*)g_curRomInfo.szGameName, "Ogre") != 0))
     {
@@ -677,6 +693,12 @@ void GenerateCurrentRomOptions()
     else if ((strncasecmp((char*)g_curRomInfo.szGameName, "MARIOKART64",11) == 0))
     {
         options.enableHackForGames = HACK_FOR_MARIO_KART;
+        options.bWideScreenHack = true;
+    }
+    else if ((strncasecmp((char*)g_curRomInfo.szGameName, "SUPER MARIO 64",14) == 0))
+    {
+        options.enableHackForGames = HACK_FOR_SUPER_MARIO_64;
+        options.bWideScreenHack = true;
     }
 
     if (options.enableHackForGames != NO_HACK_FOR_GAME)
@@ -695,6 +717,11 @@ void GenerateCurrentRomOptions()
     else currentRomOptions.bFastTexCRC--;
     if( currentRomOptions.bAccurateTextureMapping == 0 )    currentRomOptions.bAccurateTextureMapping = defaultRomOptions.bAccurateTextureMapping;
     else currentRomOptions.bAccurateTextureMapping--;
+
+    if ( options.bWideScreenHack && (windowSetting.uDisplayX==80) && (windowSetting.uDisplayWidth==640)) {
+        windowSetting.uDisplayX = 0;
+        windowSetting.uDisplayWidth = 800;
+    }
 
     options.bUseFullTMEM = ((options.bFullTMEM && (g_curRomInfo.dwFullTMEM == 0)) || g_curRomInfo.dwFullTMEM == 2);
 
@@ -935,7 +962,7 @@ char * tidy(char * s)
     char * p = s + strlen(s);
 
     p--;
-    while (p >= s && (*p == ' ' || *p == 0xa || *p == '\n') )
+    while (p >= s && (*p == ' ' || *p == 0xa || *p == '\r' || *p == '\n') )
     {
         *p = 0;
         p--;

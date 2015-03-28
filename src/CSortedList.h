@@ -57,9 +57,8 @@ public:
 
     void add(Key key, Element ele)
     {
-		bool Match = false;
-        int i = findM(key, &Match);
-        if( Match )
+        int i = find(key);
+        if( i >= 0 )
         {
             elements[i] = ele;
             return;
@@ -77,13 +76,22 @@ public:
             elements = new Element[maxSize];
             std::memcpy(keys,oldkeys,oldmaxsize*sizeof(Key));
             std::memcpy(elements,oldelements,oldmaxsize*sizeof(Element));
-			
-			delete [] oldkeys;
-        	delete [] oldelements;
         }
 
-		std::memmove(&keys[i + 1],		&keys[i],		sizeof(Key) * (curSize - i));
-		std::memmove(&elements[i + 1], 	&elements[i],	sizeof(Element) * (curSize - i));
+        for( i=0; i<curSize; i++ )
+        {
+            if( keys[i] > key )
+            {
+                // Found the spot
+                break;
+            }
+        }
+
+        for( int j=curSize; j>i; j-- )
+        {
+            keys[j] = keys[j-1];
+            elements[j] = elements[j-1];
+        }
 
         keys[i] = key;
         elements[i] = ele;
@@ -106,20 +114,12 @@ public:
         return this->operator[](index);
     }
 
-	int find(Key key)
-	{
-		return findM(key, NULL);
-	}
-
     // Binary search
-    int findM(Key key, bool * Match)
+    int find(Key key)
     {
         if( curSize <= 0 )
-		{
-			if ( NULL != Match) return 0;
- 			return -1;
-		}
-           
+            return -1;
+
         int dwMin = 0;
         int dwMax = curSize - 1;
         int index = -1;
@@ -135,20 +135,13 @@ public:
             if( keys[dwIndex] == key )
             {
                 index = dwIndex;
-				if ( NULL != Match) *Match = true;
                 break;
             }
 
             // If the range is 0, and we didn't match above, then it must be unmatched
-            if (dwRange == 0)
-			{ 
-            	if ( NULL != Match)
-				{
-					index = dwIndex;
-					*Match = false;
-			    }
-				break;
-			}
+            if (dwRange == 0) 
+                break;
+
             // If lower, check from min..index
             // If higher, check from index..max
             if (key < keys[dwIndex])

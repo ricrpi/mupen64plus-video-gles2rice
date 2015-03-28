@@ -32,7 +32,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define RICE_MATRIX_STACK   60
 #define MAX_TEXTURES         8
-#define NO_ASM
 
 enum FillMode
 {
@@ -244,6 +243,7 @@ extern void (*ProcessVertexData)(uint32 dwAddr, uint32 dwV0, uint32 dwNum);
 void ProcessVertexDataSSE(uint32 dwAddr, uint32 dwV0, uint32 dwNum);
 #endif
 void ProcessVertexDataNoSSE(uint32 dwAddr, uint32 dwV0, uint32 dwNum);
+void ProcessVertexDataNEON(uint32 dwAddr, uint32 dwV0, uint32 dwNum);
 void ProcessVertexDataExternal(uint32 dwAddr, uint32 dwV0, uint32 dwNum);
 void SetPrimitiveColor(uint32 dwCol, uint32 LODMin, uint32 LODFrac);
 void SetPrimitiveDepth(uint32 z, uint32 dwDZ);
