@@ -111,6 +111,7 @@ ifneq ("$(filter arm%,$(HOST_CPU))","")
     CPU := ARM
     ARCH_DETECTED := 32BITS
     PIC ?= 1
+    NO_ASM := 1
     CFLAGS += -fsigned-char -ffast-math
     //CFLAGS += -DANDROID
     CFLAGS += -DPAULSCODE 
