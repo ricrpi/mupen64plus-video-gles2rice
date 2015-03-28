@@ -613,7 +613,7 @@ uint32 CalculateRDRAMCRC(void *pPhysicalAddress, uint32 left, uint32 top, uint32
             dwAsmHeight = height - 1;
             dwAsmPitch = pitchInBytes;
 
-#if defined(NO_ASM)
+#if defined(NO_ASM) && !defined(__arm__)
             uint32 pitch = pitchInBytes>>2;
             uint32* pStart = (uint32*)pPhysicalAddress;
             pStart += (top * pitch) + (((left<<size)+1)>>3);
@@ -638,6 +638,35 @@ uint32 CalculateRDRAMCRC(void *pPhysicalAddress, uint32 left, uint32 top, uint32
                 pAsmStart += dwAsmPitch;
                 y--;
             }
+
+#elif defined(__arm__)
+            asm volatile(	".align                        \n"
+							"push {r1, r2, r3, r4, r5}     \n"
+                			"mov r3, %1                    \n" // = pAsmStart
+               				"mov r4, #0                    \n" // r4 =0, r4 will contain the final CRC
+                			"mov r1, %2                    \n" // int y = dwAsmHeight
+							"2:                            \n"
+							"mov r2, %3                    \n" // 
+                			"sub r2, #4                    \n" // x = dwAsmdwBytesPerLine -4
+			 				"1:                            \n"
+							"mov r5, r3					   \n" // 
+							"add r5, r2                    \n" // esi = *(uint32*)(pAsmStart + x)
+                			"eor r5, r2                    \n" // esi ^= x
+                			"ror r4, #4                    \n" // (dwAsmCRC << 4) + ((dwAsmCRC >> 28) & 15) TODO should this be 28?
+                			"add r4, r5                    \n" // dwAsmCRC += esi;
+						    "subs r2, #4                   \n" // x-=4
+						    "bge 1b                        \n" // while (x >= 0)	goto 1:
+						    "eor r5, r1                    \n" // esi ^= y;
+						    "add r4, r5                    \n" // dwAsmCRC += esi
+						    "add r3, %4                    \n" // pAsmStart += dwAsmPitch
+						    "subs r1, #1                   \n" // y--;
+						    "bge 2b                        \n" // while (y >= 0)	goto 2:
+						    "mov %0, r4                    \n" // dwAsmCRC = r4
+						    "pop {r1, r2, r3, r4, r5}      \n"
+				: "+r"(dwAsmCRC)	//output
+				: "r" (pAsmStart),"r" (dwAsmHeight),"r" (dwAsmdwBytesPerLine), "r" (dwAsmPitch)		//input
+				: "cc"		//clobbered status
+            );
 
 #elif !defined(__GNUC__) // !defined(NO_ASM)
             __asm 
