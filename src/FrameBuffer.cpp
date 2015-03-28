@@ -613,7 +613,7 @@ uint32 CalculateRDRAMCRC(void *pPhysicalAddress, uint32 left, uint32 top, uint32
             dwAsmHeight = height - 1;
             dwAsmPitch = pitchInBytes;
 
-#if defined(NO_ASM) && !defined(__arm__)
+#if defined(NO_ASM) //&& !defined(__arm__)
             uint32 pitch = pitchInBytes>>2;
             uint32* pStart = (uint32*)pPhysicalAddress;
             pStart += (top * pitch) + (((left<<size)+1)>>3);
@@ -638,7 +638,7 @@ uint32 CalculateRDRAMCRC(void *pPhysicalAddress, uint32 left, uint32 top, uint32
                 pAsmStart += dwAsmPitch;
                 y--;
             }
-
+/*
 #elif defined(__arm__)
             asm volatile(	".align                        \n"
 							"push {r1, r2, r3, r4, r5}     \n"
@@ -666,7 +666,7 @@ uint32 CalculateRDRAMCRC(void *pPhysicalAddress, uint32 left, uint32 top, uint32
 				: "+r"(dwAsmCRC)	//output
 				: "r" (pAsmStart),"r" (dwAsmHeight),"r" (dwAsmdwBytesPerLine), "r" (dwAsmPitch)		//input
 				: "cc"		//clobbered status
-            );
+            );*/
 
 #elif !defined(__GNUC__) // !defined(NO_ASM)
             __asm 
