@@ -591,12 +591,12 @@ void GenerateCurrentRomOptions()
     else if ((strstr((char*)g_curRomInfo.szGameName, "ZELDA") != 0) && (strstr((char*)g_curRomInfo.szGameName, "MASK") != 0))
     {
         options.enableHackForGames = HACK_FOR_ZELDA_MM;
-        options.bWideScreenHack = true;
+        //options.bWideScreenHack = true;
     }
     else if ((strstr((char*)g_curRomInfo.szGameName, "ZELDA") != 0))
     {
         options.enableHackForGames = HACK_FOR_ZELDA;
-        options.bWideScreenHack = true;
+        //options.bWideScreenHack = true;
     }
     else if ((strstr((char*)g_curRomInfo.szGameName, "Ogre") != 0))
     {
@@ -693,12 +693,12 @@ void GenerateCurrentRomOptions()
     else if ((strncasecmp((char*)g_curRomInfo.szGameName, "MARIOKART64",11) == 0))
     {
         options.enableHackForGames = HACK_FOR_MARIO_KART;
-        options.bWideScreenHack = true;
+        //options.bWideScreenHack = true;
     }
     else if ((strncasecmp((char*)g_curRomInfo.szGameName, "SUPER MARIO 64",14) == 0))
     {
         options.enableHackForGames = HACK_FOR_SUPER_MARIO_64;
-        options.bWideScreenHack = true;
+        //options.bWideScreenHack = true;
     }
 
     if (options.enableHackForGames != NO_HACK_FOR_GAME)
