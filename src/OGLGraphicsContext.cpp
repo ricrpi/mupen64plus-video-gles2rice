@@ -113,7 +113,7 @@ bool COGLGraphicsContext::Initialize(uint32 dwWidth, uint32 dwHeight, BOOL bWind
     /* Set the video mode */
     m64p_video_mode ScreenMode = bWindowed ? M64VIDEO_WINDOWED : M64VIDEO_FULLSCREEN;
     m64p_video_flags flags = M64VIDEOFLAG_SUPPORT_RESIZING;
-#if 1
+#if 0
     if (CoreVideo_SetVideoMode(800, windowSetting.uDisplayHeight, colorBufferDepth, ScreenMode, flags) != M64ERR_SUCCESS)
 #else
     if (CoreVideo_SetVideoMode(windowSetting.uDisplayWidth, windowSetting.uDisplayHeight, colorBufferDepth, ScreenMode, flags) != M64ERR_SUCCESS)
