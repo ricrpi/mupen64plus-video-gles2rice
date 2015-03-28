@@ -140,6 +140,9 @@ LDLIBS += -lGLESv2
 ifeq ($(CPU), X86)
   CFLAGS += -msse
 endif
+ifeq ($(NO_ASM), 1)
+  CFLAGS += -DNO_ASM
+endif
 
 # Since we are building a shared library, we must compile with -fPIC on some architectures
 # On 32-bit x86 systems we do not want to use -fPIC because we don't have to and it has a big performance penalty on this arch
