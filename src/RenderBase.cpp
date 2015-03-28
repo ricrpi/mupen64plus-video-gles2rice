@@ -1546,6 +1546,7 @@ void ProcessVertexDataNoSSE(uint32 dwAddr, uint32 dwV0, uint32 dwNum)
     DEBUGGER_PAUSE_AND_DUMP(NEXT_VERTEX_CMD,{TRACE0("Paused at Vertex Cmd");});
 }
 
+#ifdef __ARM_NEON__
 /* NEON code */
 
 #include "RenderBase_neon.h"
@@ -1709,6 +1710,7 @@ void ProcessVertexDataNEON(uint32 dwAddr, uint32 dwV0, uint32 dwNum)
     }
 #endif
 }
+#endif
 
 bool PrepareTriangle(uint32 dwV0, uint32 dwV1, uint32 dwV2)
 {

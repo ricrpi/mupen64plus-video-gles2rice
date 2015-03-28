@@ -5,6 +5,7 @@
  * See the COPYING file in the top-level directory.
  */
 
+#ifdef __ARM_NEON__
 #include "arm_features.h"
 #include "RenderBase_neon.h"
 
@@ -337,3 +338,4 @@ FUNCTION(tv_direction):
 
 
 @ vim:filetype=armasm:expandtab
+#endif
