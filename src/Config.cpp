@@ -443,7 +443,7 @@ static void ReadConfiguration(void)
     windowSetting.bDisplayFullscreen = ConfigGetParamBool(l_ConfigVideoGeneral, "Fullscreen");
     windowSetting.uDisplayHeight = ConfigGetParamInt(l_ConfigVideoGeneral, "ScreenHeight");
     windowSetting.uDisplayWidth = ConfigGetParamInt(l_ConfigVideoGeneral, "ScreenWidth");
-#if VC
+#ifdef VC
 	if(windowSetting.bDisplayFullscreen==1)
 	{
 		if (graphics_get_display_size(0 /* LCD */, &g_fb_width, &g_fb_height) < 0)
