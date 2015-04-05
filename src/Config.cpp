@@ -532,6 +532,7 @@ static void ReadConfiguration(void)
     options.bLoadHiResCRCOnly = ConfigGetParamBool(l_ConfigVideoRice, "LoadHiResCRCOnly");
     options.bDumpTexturesToFiles = ConfigGetParamBool(l_ConfigVideoRice, "DumpTexturesToFiles");
     options.bShowFPS = ConfigGetParamBool(l_ConfigVideoRice, "ShowFPS");
+	options.bWideScreenHack = 0;
 
     options.mipmapping = ConfigGetParamInt(l_ConfigVideoRice, "Mipmapping");
     options.fogMethod = ConfigGetParamInt(l_ConfigVideoRice, "FogMethod");
