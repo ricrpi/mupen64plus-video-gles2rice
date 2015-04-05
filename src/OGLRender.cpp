@@ -1132,7 +1132,12 @@ void OGLRender::UpdateScissor()
 
 void OGLRender::ApplyRDPScissor(bool force)
 {
+	int x = (int)((float)gRDP.scissor.left*windowSetting.fMultX);
+	
     if( !force && status.curScissor == RDP_SCISSOR )    return;
+
+	if(options.bWideScreenHack && x>0)
+        x = x-(int)(0.25f*(float)x-(0.125f*(float)(windowSetting.uDisplayWidth+2*windowSetting.uDisplayX)));
 
     if( options.bEnableHacks && g_CI.dwWidth == 0x200 && gRDP.scissor.right == 0x200 && g_CI.dwWidth>(*g_GraphicsInfo.VI_WIDTH_REG & 0xFFF) )
     {
@@ -1141,15 +1146,19 @@ void OGLRender::ApplyRDPScissor(bool force)
         uint32 height = (gRDP.scissor.right*gRDP.scissor.bottom)/width;
         glEnable(GL_SCISSOR_TEST);
         OPENGL_CHECK_ERRORS;
-        glScissor(0, int(height*windowSetting.fMultY+windowSetting.statusBarHeightToUse),
+        glScissor(windowSetting.uDisplayX, windowSetting.uDisplayY+int(height*windowSetting.fMultY+windowSetting.statusBarHeightToUse),
             int(width*windowSetting.fMultX), int(height*windowSetting.fMultY) );
         OPENGL_CHECK_ERRORS;
     }
     else
     {
-        glScissor(int(gRDP.scissor.left*windowSetting.fMultX), int((windowSetting.uViHeight-gRDP.scissor.bottom)*windowSetting.fMultY+windowSetting.statusBarHeightToUse),
-            int((gRDP.scissor.right-gRDP.scissor.left)*windowSetting.fMultX), int((gRDP.scissor.bottom-gRDP.scissor.top)*windowSetting.fMultY ));
-        OPENGL_CHECK_ERRORS;
+		if (options.bWideScreenHack)
+            glScissor(x, int((windowSetting.uViHeight-gRDP.scissor.bottom)*windowSetting.fMultY+windowSetting.statusBarHeightToUse),
+                         int((gRDP.scissor.right-gRDP.scissor.left)*windowSetting.fMultX), int((gRDP.scissor.bottom-gRDP.scissor.top)*windowSetting.fMultY ));
+        else
+            glScissor(windowSetting.uDisplayX+x, windowSetting.uDisplayY+int((windowSetting.uViHeight-gRDP.scissor.bottom)*windowSetting.fMultY+windowSetting.statusBarHeightToUse),
+                int((gRDP.scissor.right-gRDP.scissor.left)*windowSetting.fMultX), int((gRDP.scissor.bottom-gRDP.scissor.top)*windowSetting.fMultY ));
+         OPENGL_CHECK_ERRORS;
     }
 
     status.curScissor = RDP_SCISSOR;
@@ -1157,11 +1166,16 @@ void OGLRender::ApplyRDPScissor(bool force)
 
 void OGLRender::ApplyScissorWithClipRatio(bool force)
 {
+	int x = windowSetting.clipping.left;
+	
     if( !force && status.curScissor == RSP_SCISSOR )    return;
+
+	if(options.bWideScreenHack && x>0)
+        x = x-(int)(0.25f*(float)x-(0.125f*(float)windowSetting.uDisplayWidth));
 
     glEnable(GL_SCISSOR_TEST);
     OPENGL_CHECK_ERRORS;
-    glScissor(windowSetting.clipping.left, int((windowSetting.uViHeight-gRSP.real_clip_scissor_bottom)*windowSetting.fMultY)+windowSetting.statusBarHeightToUse,
+    glScissor(windowSetting.uDisplayX+x, windowSetting.uDisplayY+int((windowSetting.uViHeight-gRSP.real_clip_scissor_bottom)*windowSetting.fMultY)+windowSetting.statusBarHeightToUse,
         windowSetting.clipping.width, windowSetting.clipping.height);
     OPENGL_CHECK_ERRORS;
 
@@ -1275,6 +1289,10 @@ void OGLRender::glViewportWrapper(GLint x, GLint y, GLsizei width, GLsizei heigh
 
     if( x!=mx || y!=my || width!=m_width || height!=m_height || mflag!=flag)
     {
+        if (!options.bWideScreenHack) {
+            x+=windowSetting.uDisplayX;
+            y+=windowSetting.uDisplayY;
+        }
         mx=x;
         my=y;
         m_width=width;
@@ -1286,6 +1304,10 @@ void OGLRender::glViewportWrapper(GLint x, GLint y, GLsizei width, GLsizei heigh
         OPENGL_CHECK_ERRORS;
         if( flag )  glOrtho(0, windowSetting.uDisplayWidth, windowSetting.uDisplayHeight, 0, -1, 1);
         OPENGL_CHECK_ERRORS;
+        
+        if(options.bWideScreenHack && x>0)
+            x = x - (int)(0.0375f*(float)windowSetting.uDisplayWidth);
+        
         glViewport(x,y,width,height);
         OPENGL_CHECK_ERRORS;
     }

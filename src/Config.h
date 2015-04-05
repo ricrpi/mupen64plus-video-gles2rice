@@ -212,6 +212,7 @@ typedef struct {
     BOOL    bUseFullTMEM;
 
     BOOL    bShowFPS;
+	BOOL    bWideScreenHack;
 
     uint32  mipmapping;
     uint32  fogMethod;
