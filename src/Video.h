@@ -30,7 +30,8 @@ typedef struct {
     float   fViWidth, fViHeight;
     unsigned short        uViWidth, uViHeight;
     unsigned short        uDisplayWidth, uDisplayHeight;
-    
+	unsigned short		  uDisplayX, uDisplayY;
+    BOOL	bDisplayRatio;    
     BOOL    bDisplayFullscreen;
     BOOL    bVerticalSync;
 
