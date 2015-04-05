@@ -331,7 +331,7 @@ void COGLGraphicsContext::InitOGLExtension(void)
     // Compute maxAnisotropicFiltering
     m_maxAnisotropicFiltering = 0;
 
- 	if( m_bSupportAnisotropicFiltering
+/* 	if( m_bSupportAnisotropicFiltering
     && (options.anisotropicFiltering == 2
         || options.anisotropicFiltering == 4
         || options.anisotropicFiltering == 8
@@ -350,7 +350,7 @@ void COGLGraphicsContext::InitOGLExtension(void)
         //check if user want less anisotropy than hardware can do
         if((uint32) m_maxAnisotropicFiltering > options.anisotropicFiltering)
         m_maxAnisotropicFiltering = options.anisotropicFiltering;
-    }
+    }*/
 
 #if SDL_VIDEO_OPENGL
     // Nvidia only extension features (optional)
