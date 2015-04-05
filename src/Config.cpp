@@ -37,6 +37,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define NO_ASM
 
+#ifdef VC
+#include <bcm_host.h>
+#endif
+
 #define INI_FILE        "RiceVideoLinux.ini"
 
 static m64p_handle l_ConfigVideoRice = NULL;
@@ -209,6 +213,11 @@ SettingInfo OnScreenDisplaySettings[] =
 
 const int numberOfOpenGLRenderEngineSettings = sizeof(OpenGLRenderSettings)/sizeof(RenderEngineSetting);
 
+#ifdef VC
+static unsigned g_fb_width;
+static unsigned g_fb_height;
+#endif
+
 void GenerateFrameBufferOptions(void)
 {
     if( CDeviceBuilder::GetGeneralDeviceType() == OGL_DEVICE )
@@ -314,16 +323,22 @@ BOOL InitConfiguration(void)
 
 	DebugMessage(M64MSG_INFO, "DEBUG Video-Rice set default configuration");
 
-    ConfigSetDefaultBool(l_ConfigVideoGeneral, "Fullscreen", FALSE, "Use fullscreen mode if True, or windowed mode if False ");
+    ConfigSetDefaultBool(l_ConfigVideoGeneral, "Fullscreen", 0, "Use fullscreen mode if True, or windowed mode if False ");
     ConfigSetDefaultInt(l_ConfigVideoGeneral, "ScreenWidth", 640, "Width of output window or fullscreen width");
     ConfigSetDefaultInt(l_ConfigVideoGeneral, "ScreenHeight", 480, "Height of output window or fullscreen height");
+#if 1
+    ConfigSetDefaultBool(l_ConfigVideoGeneral, "AspectRatio", 1, "If true, use correct aspect ratio, if false, stretch to fullscreen");
+#endif
     ConfigSetDefaultBool(l_ConfigVideoGeneral, "VerticalSync", 0, "If true, activate the SDL_GL_SWAP_CONTROL attribute");
 
     ConfigSetDefaultInt(l_ConfigVideoRice, "FrameBufferSetting", FRM_BUF_NONE, "Frame Buffer Emulation (0=ROM default, 1=disable)");
     ConfigSetDefaultInt(l_ConfigVideoRice, "FrameBufferWriteBackControl", FRM_BUF_WRITEBACK_NORMAL, "Frequency to write back the frame buffer (0=every frame, 1=every other frame, etc)");
     ConfigSetDefaultInt(l_ConfigVideoRice, "RenderToTexture", TXT_BUF_NONE, "Render-to-texture emulation (0=none, 1=ignore, 2=normal, 3=write back, 4=write back and reload)");
+#if defined(WIN32)
+    ConfigSetDefaultInt(l_ConfigVideoRice, "ScreenUpdateSetting", SCREEN_UPDATE_AT_1ST_CI_CHANGE, "Control when the screen will be updated (0=ROM default, 1=VI origin update, 2=VI origin change, 3=CI change, 4=first CI change, 5=first primitive draw, 6=before screen clear, 7=after screen drawn)");  // SCREEN_UPDATE_AT_VI_UPDATE_AND_DRAWN
+#else
     ConfigSetDefaultInt(l_ConfigVideoRice, "ScreenUpdateSetting", SCREEN_UPDATE_BEFORE_SCREEN_CLEAR, "Control when the screen will be updated (0=ROM default, 1=VI origin update, 2=VI origin change, 3=CI change, 4=first CI change, 5=first primitive draw, 6=before screen clear, 7=after screen drawn)");  // SCREEN_UPDATE_AT_VI_UPDATE_AND_DRAWN
-    ConfigSetDefaultBool(l_ConfigVideoRice, "NormalAlphaBlender", FALSE, "Force to use normal alpha blender");
+#endif    ConfigSetDefaultBool(l_ConfigVideoRice, "NormalAlphaBlender", FALSE, "Force to use normal alpha blender");
     ConfigSetDefaultBool(l_ConfigVideoRice, "FastTextureLoading", FALSE, "Use a faster algorithm to speed up texture loading and CRC computation");
     ConfigSetDefaultBool(l_ConfigVideoRice, "AccurateTextureMapping", TRUE, "Use different texture coordinate clamping code");
     ConfigSetDefaultBool(l_ConfigVideoRice, "InN64Resolution", FALSE, "Force emulated frame buffers to be in N64 native resolution");
@@ -336,8 +351,8 @@ BOOL InitConfiguration(void)
     ConfigSetDefaultBool(l_ConfigVideoRice, "FullTMEMEmulation", FALSE, "N64 Texture Memory Full Emulation (may fix some games, may break others)");
     ConfigSetDefaultBool(l_ConfigVideoRice, "OpenGLVertexClipper", FALSE, "Enable vertex clipper for fog operations");
     ConfigSetDefaultBool(l_ConfigVideoRice, "EnableSSE", FALSE, "Enable/Disable SSE optimizations for capable CPUs");
-    ConfigSetDefaultBool(l_ConfigVideoRice, "EnableVertexShader", TRUE, "Use GPU vertex shader");
-    ConfigSetDefaultBool(l_ConfigVideoRice, "SkipFrame", TRUE, "If this option is enabled, the plugin will skip every other frame");
+    ConfigSetDefaultBool(l_ConfigVideoRice, "EnableVertexShader", FALSE, "Use GPU vertex shader");
+    ConfigSetDefaultBool(l_ConfigVideoRice, "SkipFrame", FALSE, "If this option is enabled, the plugin will skip every other frame");
     ConfigSetDefaultBool(l_ConfigVideoRice, "SkipScreenUpdate", TRUE, "If this option is enabled, the plugin will only draw every other screen update");
     ConfigSetDefaultBool(l_ConfigVideoRice, "TexRectOnly", FALSE, "If enabled, texture enhancement will be done only for TxtRect ucode");
     ConfigSetDefaultBool(l_ConfigVideoRice, "SmallTextureOnly", FALSE, "If enabled, texture enhancement will be done only for textures width+height<=128");
@@ -434,8 +449,60 @@ bool isSSESupported()
 static void ReadConfiguration(void)
 {
     windowSetting.bDisplayFullscreen = ConfigGetParamBool(l_ConfigVideoGeneral, "Fullscreen");
-    windowSetting.uDisplayWidth = ConfigGetParamInt(l_ConfigVideoGeneral, "ScreenWidth");
     windowSetting.uDisplayHeight = ConfigGetParamInt(l_ConfigVideoGeneral, "ScreenHeight");
+    windowSetting.uDisplayWidth = ConfigGetParamInt(l_ConfigVideoGeneral, "ScreenWidth");
+
+#ifdef VC
+	if(windowSetting.bDisplayFullscreen==1)
+	{
+		if (graphics_get_display_size(0 /* LCD */, &g_fb_width, &g_fb_height) < 0)
+		{
+        	printf("ERROR: Failed to get display size\n");
+    	}
+    	windowSetting.uDisplayWidth = g_fb_width;
+    	windowSetting.uDisplayHeight = g_fb_height;
+	}
+#endif    
+
+#if 1
+	windowSetting.bDisplayRatio = true;
+	windowSetting.uDisplayX = 0;
+	windowSetting.uDisplayY = 0;
+    windowSetting.bDisplayRatio = ConfigGetParamBool(l_ConfigVideoGeneral, "AspectRatio");
+	if (windowSetting.bDisplayRatio) 
+	{
+		/* Old code for fixed pandora resolution
+		if (windowSetting.uDisplayWidth==800) {
+			windowSetting.uDisplayWidth = 640;	// no strech
+			windowSetting.uDisplayX = 80;
+		}*/
+		const float dstRatio = (float)windowSetting.uDisplayHeight / (float)windowSetting.uDisplayWidth;
+    	const float srcRatio = ( 0.75f );
+    	int x = 0;
+    	int y = 0;
+    
+    	//re-scale width and height on per-rom basis
+    	float width = windowSetting.uDisplayWidth;
+    	float height = windowSetting.uDisplayHeight;
+   		// Dirty fix to keep aspect
+   		// if source and destination aspect ratios are not equal recalculate videoWith/Height
+   		if(dstRatio != srcRatio) 
+   		{
+   			windowSetting.uDisplayWidth = height / srcRatio;
+   			windowSetting.uDisplayHeight = height;
+   			if (windowSetting.uDisplayWidth > width)
+    		{
+    		    windowSetting.uDisplayWidth = width;
+    		    windowSetting.uDisplayHeight = width * srcRatio;
+    		}
+        	// else keep videoWidth/Height 
+    	}
+    	// else keep videoWidth/Height 
+
+    	windowSetting.uDisplayX = (width - windowSetting.uDisplayWidth) / 2;
+    	windowSetting.uDisplayY = (height - windowSetting.uDisplayHeight) / 2;
+	}
+#endif
     windowSetting.bVerticalSync = ConfigGetParamBool(l_ConfigVideoGeneral, "VerticalSync");
 
     defaultRomOptions.N64FrameBufferEmuType = ConfigGetParamInt(l_ConfigVideoRice, "FrameBufferSetting");
@@ -935,7 +1002,7 @@ char * tidy(char * s)
     char * p = s + strlen(s);
 
     p--;
-    while (p >= s && (*p == ' ' || *p == 0xa || *p == '\n') )
+    while (p >= s && (*p == ' ' || *p == 0xa || *p == '\r' || *p == '\n') )
     {
         *p = 0;
         p--;
