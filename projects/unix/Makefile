@@ -116,7 +116,7 @@ ifneq ("$(filter arm%,$(HOST_CPU))","")
 		CFLAGS += -mcpu=cortex-a7	  
 		CFLAGS += -mfpu=neon
 		CFLAGS += -funsafe-math-optimizations
-		$(warning Use default -mfpu=neon.')
+    $(warning Use default -mfpu=neon.')
       endif
     endif
     $(warning Architecture "$(HOST_CPU)" not officially supported.')
