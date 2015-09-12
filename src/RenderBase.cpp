@@ -45,7 +45,7 @@ inline void RSP_Vtx_Clipping(int i)
 {
     g_clipFlag[i] = 0;
     g_clipFlag2[i] = 0;
-    if( g_vecProjected[i].w > 0 )
+    if( g_vecProjected[i].w > 0.0f )
     {
         /*
         if( gRSP.bRejectVtx )
@@ -93,10 +93,10 @@ inline void RSP_Vtx_Clipping(int i)
         else
         */
         {
-            if( g_vecProjected[i].x > 1 )   g_clipFlag2[i] |= X_CLIP_MAX;
-            if( g_vecProjected[i].x < -1 )  g_clipFlag2[i] |= X_CLIP_MIN;
-            if( g_vecProjected[i].y > 1 )   g_clipFlag2[i] |= Y_CLIP_MAX;
-            if( g_vecProjected[i].y < -1 )  g_clipFlag2[i] |= Y_CLIP_MIN;
+            if( g_vecProjected[i].x > 1.0f )   g_clipFlag2[i] |= X_CLIP_MAX;
+            if( g_vecProjected[i].x < -1.0f )  g_clipFlag2[i] |= X_CLIP_MIN;
+            if( g_vecProjected[i].y > 1.0f )   g_clipFlag2[i] |= Y_CLIP_MAX;
+            if( g_vecProjected[i].y < -1.0f )  g_clipFlag2[i] |= Y_CLIP_MIN;
             //if( g_vecProjected[i].z > 1.0f )  g_clipFlag2[i] |= Z_CLIP_MAX;
             //if( gRSP.bNearClip && g_vecProjected[i].z < -1.0f )   g_clipFlag2[i] |= Z_CLIP_MIN;
         }
@@ -245,13 +245,12 @@ __asm l3:                               \
 
 #else  // use C code in other cases, this is probably faster anyway
 #define Vec3TransformNormal(vec, m) \
-   VECTOR3 temp; \
-   temp.x = (vec.x * m._11) + (vec.y * m._21) + (vec.z * m._31); \
-   temp.y = (vec.x * m._12) + (vec.y * m._22) + (vec.z * m._32); \
-   temp.z = (vec.x * m._13) + (vec.y * m._23) + (vec.z * m._33); \
-   float norm = sqrt(temp.x*temp.x+temp.y*temp.y+temp.z*temp.z); \
-   if (norm == 0.0) { vec.x = 0.0; vec.y = 0.0; vec.z = 0.0;} else \
-   { vec.x = temp.x/norm; vec.y = temp.y/norm; vec.z = temp.z/norm; }
+   float tempx = vec.x, tempy = vec.y, tempz = vec.x;\
+   vec.x = (tempx * m._11) + (tempy * m._21) + (tempz * m._31); \
+   vec.y = (tempx * m._12) + (tempy * m._22) + (tempz * m._32); \
+   vec.z = (tempx * m._13) + (tempy * m._23) + (tempz * m._33); \
+   float norm = vec.x*vec.x+vec.y*vec.y+vec.z*vec.z; \
+   if (norm != 0.0f) { norm = 1.0f / sqrtf(norm); vec.x *= norm; vec.y *= norm; vec.z *= norm; }
 #endif
 
 /*#define Vec3TransformNormal(vec, m) \
@@ -642,7 +641,7 @@ void SSEVec3TransformNormal(void)
 
 void NormalizeNormalVec()
 {
-    float w = 1/sqrtf(g_normal.x*g_normal.x + g_normal.y*g_normal.y + g_normal.z*g_normal.z);
+    float w = 1.0f / sqrtf(g_normal.x*g_normal.x + g_normal.y*g_normal.y + g_normal.z*g_normal.z);
     g_normal.x *= w;
     g_normal.y *= w;
     g_normal.z *= w;
@@ -766,11 +765,11 @@ void SetFogMinMax(float fMin, float fMax, float fMul, float fOffset)
     }
 
     {
-        gRSPfFogMin = max(0,fMin/500-1);
-        gRSPfFogMax = fMax/500-1;
+        gRSPfFogMin = max(0.0f,fMin/500.0f-1.0f);
+        gRSPfFogMax = fMax/500.0f-1.0f;
     }
 
-    gRSPfFogDivider = 255/(gRSPfFogMax-gRSPfFogMin);
+    gRSPfFogDivider = 255.0f/(gRSPfFogMax-gRSPfFogMin);
     CRender::g_pRender->SetFogMinMax(fMin, fMax);
 }
 
@@ -839,8 +838,8 @@ void ComputeLOD(bool openGL)
         float x = g_vtxProjected5[0][0] / g_vtxProjected5[0][4] - g_vtxProjected5[1][0] / g_vtxProjected5[1][4];
         float y = g_vtxProjected5[0][1] / g_vtxProjected5[0][4] - g_vtxProjected5[1][1] / g_vtxProjected5[1][4];
 
-        x = windowSetting.vpWidthW*x/windowSetting.fMultX/2;
-        y = windowSetting.vpHeightW*y/windowSetting.fMultY/2;
+        x = windowSetting.vpWidthW*x/windowSetting.fMultX/2.0f;
+        y = windowSetting.vpHeightW*y/windowSetting.fMultY/2.0f;
         d = sqrtf(x*x+y*y);
     }
     else
@@ -863,7 +862,7 @@ void ComputeLOD(bool openGL)
     frac = (lod / powf(2.0f,floorf(frac)));
     frac = frac - floorf(frac);
     //DEBUGGER_IF_DUMP(pauseAtNext,{DebuggerAppendMsg("LOD = %f, frac = %f", lod, frac);});
-    gRDP.LODFrac = (uint32)(frac*255);
+    gRDP.LODFrac = (uint32)(frac*255.0f);
     CRender::g_pRender->SetCombinerAndBlender();
 }
 
@@ -884,8 +883,8 @@ void InitVertex(uint32 dwV, uint32 vtxIndex, bool bTexture, bool openGL)
         g_vtxProjected5[vtxIndex][3] = g_vtxTransformed[dwV].w;
         g_vtxProjected5[vtxIndex][4] = g_vecProjected[dwV].z;
 
-        if( g_vtxTransformed[dwV].w < 0 )
-            g_vtxProjected5[vtxIndex][4] = 0;
+        if( g_vtxTransformed[dwV].w < 0.0f )
+            g_vtxProjected5[vtxIndex][4] = 0.0f;
 
         g_vtxIndex[vtxIndex] = vtxIndex;
     }
@@ -954,16 +953,16 @@ void InitVertex(uint32 dwV, uint32 vtxIndex, bool bTexture, bool openGL)
             // Correction for texGen result
             float u0,u1,v0,v1;
             RenderTexture &tex0 = g_textures[gRSP.curTile];
-            u0 = g_fVtxTxtCoords[dwV].x * 32 * 1024 * gRSP.fTexScaleX / tex0.m_fTexWidth;
-            v0 = g_fVtxTxtCoords[dwV].y * 32 * 1024 * gRSP.fTexScaleY / tex0.m_fTexHeight;
+            u0 = g_fVtxTxtCoords[dwV].x * 32.f * 1024.f * gRSP.fTexScaleX / tex0.m_fTexWidth;
+            v0 = g_fVtxTxtCoords[dwV].y * 32.f * 1024.f * gRSP.fTexScaleY / tex0.m_fTexHeight;
             u0 *= (gRDP.tiles[gRSP.curTile].fShiftScaleS);
             v0 *= (gRDP.tiles[gRSP.curTile].fShiftScaleT);
 
             if( CRender::g_pRender->IsTexel1Enable() )
             {
                 RenderTexture &tex1 = g_textures[(gRSP.curTile+1)&7];
-                u1 = g_fVtxTxtCoords[dwV].x * 32 * 1024 * gRSP.fTexScaleX / tex1.m_fTexWidth;
-                v1 = g_fVtxTxtCoords[dwV].y * 32 * 1024 * gRSP.fTexScaleY / tex1.m_fTexHeight;
+                u1 = g_fVtxTxtCoords[dwV].x * 32.f * 1024.f * gRSP.fTexScaleX / tex1.m_fTexWidth;
+                v1 = g_fVtxTxtCoords[dwV].y * 32.f * 1024.f * gRSP.fTexScaleY / tex1.m_fTexHeight;
                 u1 *= gRDP.tiles[(gRSP.curTile+1)&7].fShiftScaleS;
                 v1 *= gRDP.tiles[(gRSP.curTile+1)&7].fShiftScaleT;
                 CRender::g_pRender->SetVertexTextureUVCoord(v, u0, v0, u1, v1);
@@ -1038,7 +1037,7 @@ uint32 LightVert(XVECTOR4 & norm, int vidx)
         {
             fCosT = norm.x*gRSPlights[l].x + norm.y*gRSPlights[l].y + norm.z*gRSPlights[l].z; 
 
-            if (fCosT > 0 )
+            if (fCosT > 0.0f )
             {
                 r += gRSPlights[l].fr * fCosT;
                 g += gRSPlights[l].fg * fCosT;
@@ -1053,12 +1052,12 @@ uint32 LightVert(XVECTOR4 & norm, int vidx)
 
         for (register unsigned int l=0; l < gRSPnumLights; l++)
         {
-            if( gRSPlights[l].range == 0 )
+            if( gRSPlights[l].range == 0.0f )
             {
                 // Regular directional light
                 fCosT = norm.x*gRSPlights[l].x + norm.y*gRSPlights[l].y + norm.z*gRSPlights[l].z; 
 
-                if (fCosT > 0 )
+                if (fCosT > 0.0f )
                 {
                     r += gRSPlights[l].fr * fCosT;
                     g += gRSPlights[l].fg * fCosT;
@@ -1083,10 +1082,10 @@ uint32 LightVert(XVECTOR4 & norm, int vidx)
 
                 fCosT = norm.x*dir.x + norm.y*dir.y + norm.z*dir.z; 
 
-                if (fCosT > 0 )
+                if (fCosT > 0.0f )
                 {
                     //float f = d2/gRSPlights[l].range*50;
-                    float f = d2/15000*50;
+                    float f = d2 * 50.0f / 15000.0f;
                     f = 1 - min(f,1);
                     fCosT *= f*f;
 
@@ -1098,9 +1097,9 @@ uint32 LightVert(XVECTOR4 & norm, int vidx)
         }
     }
 
-    if (r > 255) r = 255;
-    if (g > 255) g = 255;
-    if (b > 255) b = 255;
+    if (r > 255.0f) r = 255.0f;
+    if (g > 255.0f) g = 255.0f;
+    if (b > 255.0f) b = 255.0f;
     return ((0xff000000)|(((uint32)r)<<16)|(((uint32)g)<<8)|((uint32)b));
 }
 
@@ -1118,7 +1117,7 @@ uint32 LightVertNew(XVECTOR4 & norm)
     {
         fCosT = norm.x*gRSPlights[l].tx + norm.y*gRSPlights[l].ty + norm.z*gRSPlights[l].tz; 
 
-        if (fCosT > 0 )
+        if (fCosT > 0.0f )
         {
             r += gRSPlights[l].fr * fCosT;
             g += gRSPlights[l].fg * fCosT;
@@ -1126,16 +1125,16 @@ uint32 LightVertNew(XVECTOR4 & norm)
         }
     }
 
-    if (r > 255) r = 255;
-    if (g > 255) g = 255;
-    if (b > 255) b = 255;
+    if (r > 255.0f) r = 255.0f;
+    if (g > 255.0f) g = 255.0f;
+    if (b > 255.0f) b = 255.0f;
     return ((0xff000000)|(((uint32)r)<<16)|(((uint32)g)<<8)|((uint32)b));
 }
 
 
-float zero = 0.0f;
-float onef = 1.0f;
-float fcosT;
+static float zero = 0.0f;
+static float onef = 1.0f;
+static float fcosT;
 
 #if !defined(__GNUC__) && !defined(NO_ASM)
 __declspec( naked ) uint32  __fastcall SSELightVert()
@@ -1194,7 +1193,7 @@ breakout:
 uint32 SSELightVert(void)
 {
   uint32 rval;
-  float f255 = 255.0, fZero = 0.0;
+  float f255 = 255.0f, fZero = 0.0f;
   
   asm volatile(" movaps        %1,  %%xmm3    \n" // xmm3 == gRSP.fAmbientLight{RGBA}
            " movaps            %2,  %%xmm4    \n" // xmm4 == g_normal.{xyz}
@@ -1243,7 +1242,7 @@ uint32 SSELightVert(void)
 uint32 SSELightVert(void)
 {
   uint32 rval;
-  float f255 = 255.0, fZero = 0.0;
+  float f255 = 255.0f, fZero = 0.0f;
 
   asm volatile(" movaps            %1,  %%xmm3    \n"
                " movaps            %2,  %%xmm4    \n"
@@ -1353,7 +1352,7 @@ void ProcessVertexDataSSE(uint32 dwAddr, uint32 dwV0, uint32 dwNum)
         if( gRSP.bFogEnabled )
         {
             g_fFogCoord[i] = g_vecProjected[i].z;
-            if( g_vecProjected[i].w < 0 || g_vecProjected[i].z < 0 || g_fFogCoord[i] < gRSPfFogMin )
+            if( g_vecProjected[i].w < 0.0f || g_vecProjected[i].z < 0.0f || g_fFogCoord[i] < gRSPfFogMin )
                 g_fFogCoord[i] = gRSPfFogMin;
         }
 
@@ -1475,7 +1474,7 @@ void ProcessVertexDataNoSSE(uint32 dwAddr, uint32 dwV0, uint32 dwNum)
         if( gRSP.bFogEnabled )
         {
             g_fFogCoord[i] = g_vecProjected[i].z;
-            if( g_vecProjected[i].w < 0 || g_vecProjected[i].z < 0 || g_fFogCoord[i] < gRSPfFogMin )
+            if( g_vecProjected[i].w < 0.0f || g_vecProjected[i].z < 0.0f || g_fFogCoord[i] < gRSPfFogMin )
                 g_fFogCoord[i] = gRSPfFogMin;
         }
 
@@ -1610,16 +1609,16 @@ bool IsTriangleVisible(uint32 dwV0, uint32 dwV1, uint32 dwV2)
             float W1 = v2.x - v1.x;
             float W2 = v2.y - v1.y;
 
-            float fDirection = (V1 * W2) - (V2 * W1);
-            fDirection = fDirection * v1.w * v2.w * v0.w;
-            //float fDirection = v0.x*v1.y-v1.x*v0.y+v1.x*v2.y-v2.x*v1.y+v2.x*v0.y-v0.x*v2.y;
+            float fDirection = ((V1 * W2) - (V2 * W1)) * v0.w * v1.w * v2.w;
 
-            if (fDirection < 0 && gRSP.bCullBack)
+			//float fDirection = v0.x*v1.y-v1.x*v0.y+v1.x*v2.y-v2.x*v1.y+v2.x*v0.y-v0.x*v2.y;
+
+            if (fDirection < 0.0f && gRSP.bCullBack)
             {
                 status.dwNumTrisClipped++;
                 return false;
             }
-            else if (fDirection > 0 && gRSP.bCullFront)
+            else if (fDirection > 0.0f && gRSP.bCullFront)
             {
                 status.dwNumTrisClipped++;
                 return false;
@@ -1827,7 +1826,7 @@ void ProcessVertexDataDKR(uint32 dwAddr, uint32 dwV0, uint32 dwNum)
         if( gRSP.bFogEnabled )
         {
             g_fFogCoord[i] = g_vecProjected[i].z;
-            if( g_vecProjected[i].w < 0 || g_vecProjected[i].z < 0 || g_fFogCoord[i] < gRSPfFogMin )
+            if( g_vecProjected[i].w < 0.0f || g_vecProjected[i].z < 0.0f || g_fFogCoord[i] < gRSPfFogMin )
                 g_fFogCoord[i] = gRSPfFogMin;
         }
 
@@ -1869,7 +1868,7 @@ void ProcessVertexDataDKR(uint32 dwAddr, uint32 dwV0, uint32 dwNum)
 
         ReplaceAlphaWithFogFactor(i);
 
-        g_fVtxTxtCoords[i].x = g_fVtxTxtCoords[i].y = 1;
+        g_fVtxTxtCoords[i].x = g_fVtxTxtCoords[i].y = 1.0f;
 
         nOff += 10;
     }
@@ -1909,7 +1908,7 @@ void ProcessVertexDataPD(uint32 dwAddr, uint32 dwV0, uint32 dwNum)
         }
 
         g_fFogCoord[i] = g_vecProjected[i].z;
-        if( g_vecProjected[i].w < 0 || g_vecProjected[i].z < 0 || g_fFogCoord[i] < gRSPfFogMin )
+        if( g_vecProjected[i].w < 0.0f || g_vecProjected[i].z < 0.0f || g_fFogCoord[i] < gRSPfFogMin )
             g_fFogCoord[i] = gRSPfFogMin;
 
         RSP_Vtx_Clipping(i);
@@ -2021,7 +2020,7 @@ void ProcessVertexDataConker(uint32 dwAddr, uint32 dwV0, uint32 dwNum)
         }
 
         g_fFogCoord[i] = g_vecProjected[i].z;
-        if( g_vecProjected[i].w < 0 || g_vecProjected[i].z < 0 || g_fFogCoord[i] < gRSPfFogMin )
+        if( g_vecProjected[i].w < 0.0f || g_vecProjected[i].z < 0.0f || g_fFogCoord[i] < gRSPfFogMin )
             g_fFogCoord[i] = gRSPfFogMin;
 
         VTX_DUMP( 
@@ -2175,7 +2174,7 @@ void ProcessVertexData_Rogue_Squadron(uint32 dwXYZAddr, uint32 dwColorAddr, uint
         });
 
         g_fFogCoord[i] = g_vecProjected[i].z;
-        if( g_vecProjected[i].w < 0 || g_vecProjected[i].z < 0 || g_fFogCoord[i] < gRSPfFogMin )
+        if( g_vecProjected[i].w < 0.0f || g_vecProjected[i].z < 0.0f || g_fFogCoord[i] < gRSPfFogMin )
             g_fFogCoord[i] = gRSPfFogMin;
 
         RSP_Vtx_Clipping(i);
@@ -2250,7 +2249,7 @@ void SetLightCol(uint32 dwLight, uint32 dwCol)
     gRSPlights[dwLight].fr = (float)gRSPlights[dwLight].r;
     gRSPlights[dwLight].fg = (float)gRSPlights[dwLight].g;
     gRSPlights[dwLight].fb = (float)gRSPlights[dwLight].b;
-    gRSPlights[dwLight].fa = 255;   // Ignore light alpha
+    gRSPlights[dwLight].fa = 255.0f;   // Ignore light alpha
 
     //TRACE1("Set light %d color", dwLight);
     LIGHT_DUMP(TRACE2("Set Light %d color: %08X", dwLight, dwCol));
@@ -2264,11 +2263,11 @@ void SetLightDirection(uint32 dwLight, float x, float y, float z, float range)
     //gRSPlights[dwLight].oy = y;
     //gRSPlights[dwLight].oz = z;
 
-    register float w = range == 0 ? (float)sqrt(x*x+y*y+z*z) : 1;
+    register float w = range == 0.0f ? 1.0f / sqrtf(x*x+y*y+z*z) : 1.0f;
 
-    gRSPlights[dwLight].x = x/w;
-    gRSPlights[dwLight].y = y/w;
-    gRSPlights[dwLight].z = z/w;
+    gRSPlights[dwLight].x = x * w;
+    gRSPlights[dwLight].y = y * w;
+    gRSPlights[dwLight].z = z * w;
     gRSPlights[dwLight].range = range;
     DEBUGGER_PAUSE_AND_DUMP(NEXT_SET_LIGHT,TRACE5("Set Light %d dir: %.4f, %.4f, %.4f, %.4f", dwLight, x, y, z, range));
 }
@@ -2282,19 +2281,19 @@ void LogTextureCoords(float fTex0S, float fTex0T, float fTex1S, float fTex1T)
 {
     if( validS0 )
     {
-        if( fTex0S<0 || fTex0S>maxS0 )  validS0 = false;
+        if( fTex0S<0.0f || fTex0S>maxS0 )  validS0 = false;
     }
     if( validT0 )
     {
-        if( fTex0T<0 || fTex0T>maxT0 )  validT0 = false;
+        if( fTex0T<0.0f || fTex0T>maxT0 )  validT0 = false;
     }
     if( validS1 )
     {
-        if( fTex1S<0 || fTex1S>maxS1 )  validS1 = false;
+        if( fTex1S<0.0f || fTex1S>maxS1 )  validS1 = false;
     }
     if( validT1 )
     {
-        if( fTex1T<0 || fTex1T>maxT1 )  validT1 = false;
+        if( fTex1T<0.0f || fTex1T>maxT1 )  validT1 = false;
     }
 }
 
@@ -2335,7 +2334,7 @@ void ForceMainTextureIndex(int dwTile)
 
 float HackZ2(float z)
 {
-    z = (z+9)/10;
+    z = (z+9.0f)/10.0f;
     return z;
 }
 
@@ -2343,11 +2342,11 @@ float HackZ(float z)
 {
     return HackZ2(z);
 
-    if( z < 0.1 && z >= 0 )
-        z = (.1f+z)/2;
-    else if( z < 0 )
+    if( z < 0.1f && z >= 0.0f )
+        z = (0.1f+z)/2.0f;
+    else if( z < 0.0f )
         //return (10+z)/100;
-        z = (expf(z)/20);
+        z = (expf(z)/20.0f);
     return z;
 }
 
