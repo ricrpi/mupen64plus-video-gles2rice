@@ -133,11 +133,13 @@ Possible Blending Factors:
         //Enable();
         Disable();
         break;
+
     case CYCLE_TYPE_COPY:
         //Disable();
         BlendFunc(BLEND_ONE, BLEND_ZERO);
         Enable();
         break;
+
     case CYCLE_TYPE_2:
         if( gRDP.otherMode.force_bl && gRDP.otherMode.z_cmp )
         {
@@ -171,6 +173,7 @@ Possible Blending Factors:
 
             render->SetAlphaTestEnable( ((gRDP.otherModeL >> RSP_SETOTHERMODE_SHIFT_ALPHACOMPARE) & 0x3)==1 ? TRUE : FALSE);
             break;
+
         case BLEND_PASS+(BLEND_OPA>>2):
             // 0x0c19
             // Cycle1:  In * 0 + In * 1
@@ -186,6 +189,7 @@ Possible Blending Factors:
                 Enable();
             }
             break;
+
         case BLEND_PASS + (BLEND_XLU>>2):
             // 0x0c18
             // Cycle1:  In * 0 + In * 1
@@ -217,6 +221,7 @@ Possible Blending Factors:
             BlendFunc(BLEND_SRCALPHA, BLEND_INVSRCALPHA);
             Enable();
             break;
+
         case BLEND_FOG_MEM_FOG_MEM + (BLEND_OPA>>2):
             //Cycle1:   In * AFog + Fog * 1-A
             //Cycle2:   In * AIn + Mem * AMem   
@@ -249,19 +254,23 @@ Possible Blending Factors:
         case BLEND_FOG_3+(BLEND_PASS>>2):
             BlendFunc(BLEND_ONE, BLEND_ZERO);
             Enable();
+			render->SetAlphaTestEnable(TRUE);	//Fixes alpha test on textures (square block looking textures)
             break;
+
         case BLEND_FOG_ASHADE+0x0301:
             // c800 - Cycle1:   Fog * AShade + In * 1-A
             // 0301 - Cycle2:   In * 0 + In * AMem
             BlendFunc(BLEND_SRCALPHA, BLEND_ZERO);
             Enable();
             break;
+
         case 0x0c08+0x1111:
             // 0c08 - Cycle1:   In * 0 + In * 1
             // 1111 - Cycle2:   Mem * AFog + Mem * AMem
             BlendFunc(BLEND_ZERO, BLEND_DESTALPHA);
             Enable();
             break;
+
         default:
 #ifdef DEBUGGER
             if( pauseAtNext )
@@ -295,6 +304,7 @@ Possible Blending Factors:
             break;
         }
         break;
+
     default:    // 1/2 Cycle or Copy
         if( gRDP.otherMode.force_bl && gRDP.otherMode.z_cmp && blendmode_1 != BLEND_FOG_ASHADE )
         {
@@ -328,10 +338,12 @@ Possible Blending Factors:
             BlendFunc(BLEND_SRCALPHA, BLEND_INVSRCALPHA);
             Enable();
             break;
+
         case BLEND_MEM_ALPHA_IN:    //  Mem * AIn + Mem * AMem
             BlendFunc(BLEND_ZERO, BLEND_DESTALPHA);
             Enable();
             break;
+
         case BLEND_PASS:    // IN * 0 + IN * 1
             BlendFunc(BLEND_ONE, BLEND_ZERO);
             if( gRDP.otherMode.alpha_cvg_sel )
@@ -343,6 +355,7 @@ Possible Blending Factors:
                 Disable();
             }
             break;
+
         case BLEND_OPA:     // IN * A_IN + MEM * A_MEM
             if( options.enableHackForGames == HACK_FOR_MARIO_TENNIS )
             {
@@ -354,6 +367,7 @@ Possible Blending Factors:
             }
             Enable();
             break;
+
         case BLEND_NOOP:        // IN * A_IN + IN * (1 - A_IN)
         case BLEND_FOG_ASHADE:  // Fog * AShade + In * 1-A
         case BLEND_FOG_MEM_3:   // Mem * AFog + Fog * 1-A
@@ -361,20 +375,24 @@ Possible Blending Factors:
             BlendFunc(BLEND_ONE, BLEND_ZERO);
             Enable();
             break;
+
         case BLEND_FOG_APRIM:   // Fog * AFog + In * 1-A
             BlendFunc(BLEND_INVSRCALPHA, BLEND_ZERO);
             Enable();
             break;
+
         case BLEND_NOOP3:       // In * 0 + Mem * 1
         case BLEND_NOOP5:       // Fog * 0 + Mem * 1
             BlendFunc(BLEND_ZERO, BLEND_ONE);
             Enable();
             break;
+
         case BLEND_MEM:     // Mem * 0 + Mem * 1-A
             // WaveRace
             BlendFunc(BLEND_ZERO, BLEND_ONE);
             Enable();
             break;
+
         default:
 #ifdef DEBUGGER
             if( pauseAtNext )
