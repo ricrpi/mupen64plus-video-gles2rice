@@ -229,13 +229,12 @@ Possible Blending Factors:
             Enable();
             break;
 
-        case BLEND_FOG_ASHADE + (BLEND_OPA>>2):
-            //Cycle1:   Fog * AShade + In * 1-A
-            //Cycle2:   In * AIn + Mem * AMem   
-			render->SetAlphaTestEnable(TRUE);	//Fixes alpha test on textures (square block looking textures)
         case BLEND_FOG_APRIM + (BLEND_OPA>>2):
             // For Golden Eye
             //Cycle1:   Fog * AFog + In * 1-A
+            //Cycle2:   In * AIn + Mem * AMem   
+        case BLEND_FOG_ASHADE + (BLEND_OPA>>2):
+            //Cycle1:   Fog * AShade + In * 1-A
             //Cycle2:   In * AIn + Mem * AMem   
         case BLEND_BI_AFOG + (BLEND_OPA>>2):
             //Cycle1:   Bl * AFog + In * 1-A
