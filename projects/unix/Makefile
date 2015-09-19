@@ -112,9 +112,17 @@ ifneq ("$(filter arm%,$(HOST_CPU))","")
     ARCH_DETECTED := 32BITS
     PIC ?= 1
     NO_ASM := 1
-    CFLAGS += -fsigned-char -ffast-math
+    CFLAGS += -fsigned-char
     //CFLAGS += -DANDROID
-    CFLAGS += -DPAULSCODE 
+    CFLAGS += -DPAULSCODE
+    ifeq ($(NEON), 1)
+      ifeq ("$(filter -mfpu=neon%,$(OPTFLAGS))","")
+		CFLAGS += -mcpu=cortex-a7	  
+		CFLAGS += -mfpu=neon
+		CFLAGS += -funsafe-math-optimizations
+    $(warning Use default -mfpu=neon.')
+      endif
+    endif 
     $(warning Architecture "$(HOST_CPU)" not officially supported.')
   endif
 endif
@@ -125,7 +133,7 @@ endif
 # base CFLAGS, LDLIBS, and LDFLAGS
 OPTFLAGS ?= -flto
 WARNFLAGS ?= -Wall
-CFLAGS += $(OPTFLAGS) $(WARNFLAGS) -ffast-math -fno-strict-aliasing -fvisibility=hidden -I../../src -DSDL_VIDEO_OPENGL_ES2=1 -DSDL_VIDEO_OPENGL=0
+CFLAGS += $(OPTFLAGS) $(WARNFLAGS) -ffast-math -fsingle-precision-constant -fno-strict-aliasing -fvisibility=hidden -I../../src -DSDL_VIDEO_OPENGL_ES2=1 -DSDL_VIDEO_OPENGL=0
 CXXFLAGS += -fvisibility-inlines-hidden -DSDL_VIDEO_OPENGL_ES2=1 -DSDL_VIDEO_OPENGL=0
 LDFLAGS += $(SHARED)
 
@@ -400,6 +408,7 @@ targets:
 	@echo "    APIDIR=path   == path to find Mupen64Plus Core headers"
 	@echo "    OPTFLAGS=flag == compiler optimization (default: -O3 -flto)"
 	@echo "    VC=1 	 == build against Broadcom Videocore GLESv2"
+	@echo "    NEON=1 	 == build against Pi2 and NEON optimations"
 	@echo "    WARNFLAGS=flag == compiler warning levels (default: -Wall)"
 	@echo "    PIC=(1|0)     == Force enable/disable of position independent code"
 	@echo "    POSTFIX=name  == String added to the name of the the build (default: '')"
