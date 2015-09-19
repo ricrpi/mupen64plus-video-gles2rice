@@ -1846,15 +1846,12 @@ void SetPrimitiveColor(uint32 dwCol, uint32 LODMin, uint32 LODFrac)
 void SetPrimitiveDepth(uint32 z, uint32 dwDZ)
 {
     gRDP.primitiveDepth = z & 0x7FFF;
-    gRDP.fPrimitiveDepth = (float)(gRDP.primitiveDepth)/(float)0x8000;
+    //gRDP.fPrimitiveDepth = (float)(gRDP.primitiveDepth)/(float)0x8000;
+    //gRDP.fPrimitiveDepth = gRDP.fPrimitiveDepth*2-1;    //the farest z=0xFFFF->1.0f //the nearest z=0->-1.0f
 
-    //gRDP.fPrimitiveDepth = gRDP.fPrimitiveDepth*2-1;  
-    /*
-    z=0xFFFF    ->  1   the farest
-    z=0         ->  -1  the nearest
-    */
+    gRDP.fPrimitiveDepth = (float)(0x7FFF-gRDP.primitiveDepth) / (float)0x8000;	//GLES depth range (Fixes Rayman2 and many other depth issues with sprites and geometry)
 
-    //how to use dwDZ?
+	//how to use dwDZ?
 
 #ifdef DEBUGGER
     if( (pauseAtNext && (eventToPause == NEXT_VERTEX_CMD || eventToPause == NEXT_FLUSH_TRI )) )//&& logTriangles ) 
