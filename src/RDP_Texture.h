@@ -428,6 +428,13 @@ inline uint32 swapdword( uint32 value )
                :
                );
    return value;
+#elif defined(__arm__)
+ 	asm volatile("rev16 %0, %0" 
+				: "+r"(value)
+				: 
+				: 
+				);
+	return value;
 #else
   return ((value & 0xff000000) >> 24) |
          ((value & 0x00ff0000) >>  8) |
@@ -451,6 +458,13 @@ inline uint16 swapword( uint16 value )
                :
                );
   return value;
+#elif defined(__arm__)
+ 	asm volatile("rev %0, %0" 
+				: "+r"(value)
+				: 
+				: 
+				);
+	return value;
 #else
   return ((value & 0xff00) >> 8) |
          ((value & 0x00ff) << 8);
