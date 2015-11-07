@@ -1001,6 +1001,9 @@ EXPORT void CALL ReadScreen2(void *dest, int *width, int *height, int bFront)
     glReadPixels( 0, 0, windowSetting.uDisplayWidth, windowSetting.uDisplayHeight,
                  GL_RGB, GL_UNSIGNED_BYTE, dest );
     glReadBuffer( oldMode );
+#else
+    glReadPixels( 0, 0, windowSetting.uDisplayWidth, windowSetting.uDisplayHeight,
+                 GL_RGBA, GL_UNSIGNED_BYTE, dest );
 #endif
 }
     
