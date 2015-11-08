@@ -55,12 +55,12 @@ COGLTexture::COGLTexture(uint32 dwWidth, uint32 dwHeight, TextureUsage usage) :
     {
     case TXT_QUALITY_DEFAULT:
         if( options.colorQuality == TEXTURE_FMT_A4R4G4B4 ) 
-            m_glFmt = GL_RGBA4;
+            m_glFmt = GL_RGBA; //GL_RGBA4;
         break;
     case TXT_QUALITY_32BIT:
         break;
     case TXT_QUALITY_16BIT:
-            m_glFmt = GL_RGBA4;
+            m_glFmt = GL_RGBA; //GL_RGBA4;
         break;
     };
     LOG_TEXTURE(TRACE2("New texture: (%d, %d)", dwWidth, dwHeight));
