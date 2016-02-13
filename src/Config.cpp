@@ -211,11 +211,6 @@ SettingInfo OnScreenDisplaySettings[] =
 
 const int numberOfOpenGLRenderEngineSettings = sizeof(OpenGLRenderSettings)/sizeof(RenderEngineSetting);
 
-#ifdef VC
-static unsigned g_fb_width;
-static unsigned g_fb_height;
-#endif
-
 void GenerateFrameBufferOptions(void)
 {
     if( CDeviceBuilder::GetGeneralDeviceType() == OGL_DEVICE )
@@ -448,6 +443,10 @@ static void ReadConfiguration(void)
 #ifdef VC
 	if(windowSetting.bDisplayFullscreen==1)
 	{
+            uint32_t g_fb_width;
+            uint32_t g_fb_height;
+            
+	    bcm_host_init();
 	    if (graphics_get_display_size(0 /* LCD */, &g_fb_width, &g_fb_height) < 0)
 	    {
                 printf("ERROR: Failed to get display size\n");
