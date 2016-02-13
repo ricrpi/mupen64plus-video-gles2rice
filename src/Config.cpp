@@ -448,12 +448,15 @@ static void ReadConfiguration(void)
 #ifdef VC
 	if(windowSetting.bDisplayFullscreen==1)
 	{
-		if (graphics_get_display_size(0 /* LCD */, &g_fb_width, &g_fb_height) < 0)
-		{
-        	printf("ERROR: Failed to get display size\n");
-    	}
-    	windowSetting.uDisplayWidth = g_fb_width;
-    	windowSetting.uDisplayHeight = g_fb_height;
+	    if (graphics_get_display_size(0 /* LCD */, &g_fb_width, &g_fb_height) < 0)
+	    {
+                printf("ERROR: Failed to get display size\n");
+    	    }
+    	    else
+    	    {
+    	        windowSetting.uDisplayWidth = g_fb_width;
+    	        windowSetting.uDisplayHeight = g_fb_height;
+    	    }
 	}
 #endif    
 
@@ -461,7 +464,7 @@ static void ReadConfiguration(void)
 	windowSetting.bDisplayRatio = true;
 	windowSetting.uDisplayX = 0;
 	windowSetting.uDisplayY = 0;
-    windowSetting.bDisplayRatio = ConfigGetParamBool(l_ConfigVideoGeneral, "AspectRatio");
+        windowSetting.bDisplayRatio = ConfigGetParamBool(l_ConfigVideoGeneral, "AspectRatio");
 	if (windowSetting.bDisplayRatio) 
 	{
 		/* Old code for fixed pandora resolution
@@ -470,13 +473,13 @@ static void ReadConfiguration(void)
 			windowSetting.uDisplayX = 80;
 		}*/
 		const float dstRatio = (float)windowSetting.uDisplayHeight / (float)windowSetting.uDisplayWidth;
-    	const float srcRatio = ( 0.75f );
-    	int x = 0;
-    	int y = 0;
+    	        const float srcRatio = ( 0.75f );
+    	        int x = 0;
+    	        int y = 0;
     
-    	//re-scale width and height on per-rom basis
-    	float width = windowSetting.uDisplayWidth;
-    	float height = windowSetting.uDisplayHeight;
+    	        //re-scale width and height on per-rom basis
+    	        float width = windowSetting.uDisplayWidth;
+    	        float height = windowSetting.uDisplayHeight;
    		// Dirty fix to keep aspect
    		// if source and destination aspect ratios are not equal recalculate videoWith/Height
    		if(dstRatio != srcRatio) 
