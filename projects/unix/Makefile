@@ -230,12 +230,14 @@ endif
 ifeq ($(OS), MINGW)
   GL_LDLIBS = -lopengl32
 endif
-ifeq ($(origin GL_CFLAGS) $(origin GL_LDLIBS), undefined undefined)
-  ifeq ($(shell $(PKG_CONFIG) --modversion gl 2>/dev/null),)
-    $(error No OpenGL development libraries found!)
+ifneq ($(USE_GLES), 1)
+  ifeq ($(origin GL_CFLAGS) $(origin GL_LDLIBS), undefined undefined)
+    ifeq ($(shell $(PKG_CONFIG) --modversion gl 2>/dev/null),)
+      $(error No OpenGL development libraries found!)
+    endif
+    GL_CFLAGS += $(shell $(PKG_CONFIG) --cflags gl)
+    GL_LDLIBS +=  $(shell $(PKG_CONFIG) --libs gl)
   endif
-  GL_CFLAGS += $(shell $(PKG_CONFIG) --cflags gl)
-  GL_LDLIBS +=  $(shell $(PKG_CONFIG) --libs gl)
 endif
 CFLAGS += $(GL_CFLAGS)
 LDLIBS += $(GL_LDLIBS)
@@ -407,6 +409,7 @@ targets:
 	@echo "    NO_ASM=1      == build without inline assembly code (x86 MMX/SSE)"
 	@echo "    APIDIR=path   == path to find Mupen64Plus Core headers"
 	@echo "    OPTFLAGS=flag == compiler optimization (default: -O3 -flto)"
+	@echo "    USE_GLES=1    == build against GLESv2 instead of OpenGL"
 	@echo "    VC=1 	 == build against Broadcom Videocore GLESv2"
 	@echo "    NEON=1 	 == build against Pi2 and NEON optimations"
 	@echo "    WARNFLAGS=flag == compiler warning levels (default: -Wall)"
