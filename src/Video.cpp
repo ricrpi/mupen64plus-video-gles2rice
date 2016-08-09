@@ -1006,9 +1006,27 @@ EXPORT void CALL ReadScreen2(void *dest, int *width, int *height, int bFront)
     if (dest == NULL)
         return;
 
-	// we have to use GL_RGBA on Raspberry pi
-	glReadPixels( 0, 0, windowSetting.uDisplayWidth, windowSetting.uDisplayHeight,
-                 GL_RGBA, GL_UNSIGNED_BYTE, dest );
+	const uint32_t pixelCount = windowSetting.uDisplayWidth * windowSetting.uDisplayHeight;
+	uint8_t* temp_dest = (uint8_t*)malloc(pixelCount * 4U);
+
+	if (temp_dest == NULL)
+	{
+		return;
+	}
+
+    glReadPixels(0, 0, windowSetting.uDisplayWidth, windowSetting.uDisplayHeight, GL_RGBA, GL_UNSIGNED_BYTE, temp_dest );
+
+	// The core expects the buffer to be in GL_RGB and not pixelCount *4 in length so convert
+	uint32_t j = 0U;
+	for (uint32_t i = 0U; i < pixelCount*4U; i += 4)
+	{
+		((uint8_t*)dest)[j + 0] = temp_dest[i + 0];
+		((uint8_t*)dest)[j + 1] = temp_dest[i + 1];
+		((uint8_t*)dest)[j + 2] = temp_dest[i + 2];
+		j += 3;
+	}
+
+	free(temp_dest);
 }
     
 
