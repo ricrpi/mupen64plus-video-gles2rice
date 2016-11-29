@@ -419,6 +419,7 @@ void SetVIScales()
         uint32 end = *g_GraphicsInfo.VI_H_START_REG&0xFFFF;
         uint32 width = *g_GraphicsInfo.VI_WIDTH_REG;
         windowSetting.fViWidth = (end-start)*xscale;
+		
         if( abs((int)(windowSetting.fViWidth - width) ) < 8 ) 
         {
             windowSetting.fViWidth = (float)width;
@@ -441,8 +442,8 @@ void SetVIScales()
         }
         else
         {
-            if( *g_GraphicsInfo.VI_WIDTH_REG > 0x300 ) 
-                windowSetting.fViHeight *= 2;
+            if( width > 0x300 || width >= ((uint32)windowSetting.fViWidth << 1) )	//Fix menu in 40 winks 
+                windowSetting.fViHeight += windowSetting.fViHeight;
 
             if( windowSetting.fViWidth*status.fRatio > windowSetting.fViHeight && (*g_GraphicsInfo.VI_X_SCALE_REG & 0xFF) != 0 )
             {

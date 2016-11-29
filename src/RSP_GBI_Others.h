@@ -1642,6 +1642,9 @@ void DLParser_TexRect_Last_Legion(Gfx *gfx)
     float fS0 = s16S / 32.0f;
     float fT0 = s16T / 32.0f;
 
+	if(s16DSDX<0) fS0 += 1.0f;	//Fix texture seams (California Speed)
+	if(s16DTDY<0) fT0 += 1.0f;	//Fix texture seams (California Speed)
+
     float fDSDX = s16DSDX / 1024.0f;
     float fDTDY = s16DTDY / 1024.0f;
 
