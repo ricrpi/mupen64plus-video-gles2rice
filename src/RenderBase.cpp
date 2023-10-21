@@ -19,6 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <cmath>
 #include <vector>
+#include <algorithm>
 
 #include "osal_preproc.h"
 #include "float.h"
@@ -750,7 +751,7 @@ void SetFogMinMax(float fMin, float fMax, float fMul, float fOffset)
     }
 
     {
-        gRSPfFogMin = max(0,fMin/500-1);
+        gRSPfFogMin = std::max(0,fMin/500-1);
         gRSPfFogMax = fMax/500-1;
     }
 
@@ -1089,7 +1090,7 @@ uint32 LightVert(XVECTOR4 & norm, int vidx)
                 {
                     //float f = d2/gRSPlights[l].range*50;
                     float f = d2/15000*50;
-                    f = 1 - min(f,1);
+                    f = 1 - std::min(f,1);
                     fCosT *= f*f;
 
                     r += gRSPlights[l].fr * fCosT;
@@ -1720,7 +1721,7 @@ bool PrepareTriangle(uint32 dwV0, uint32 dwV1, uint32 dwV2)
         g_vtxIndex[gRSP.numVertices++] = dwV1;
         g_vtxIndex[gRSP.numVertices++] = dwV2;
         status.dwNumTrisRendered++;
-        gRSP.maxVertexID = max(gRSP.maxVertexID,max(dwV0,max(dwV1,dwV2)));
+        gRSP.maxVertexID = std::max(gRSP.maxVertexID,std::max(dwV0,std::max(dwV1,dwV2)));
     }
     else
     {

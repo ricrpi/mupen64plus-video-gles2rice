@@ -1727,7 +1727,7 @@ void DLParser_TexRect_Last_Legion(Gfx *gfx)
     }
 
     if( status.bHandleN64RenderTexture ) 
-        g_pRenderTextureInfo->maxUsedHeight = max(g_pRenderTextureInfo->maxUsedHeight,(int)dwYH);
+        g_pRenderTextureInfo->maxUsedHeight = std::max(g_pRenderTextureInfo->maxUsedHeight,(int)dwYH);
 
     ForceMainTextureIndex(curTile);
 }
