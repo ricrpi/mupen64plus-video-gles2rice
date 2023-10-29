@@ -49,9 +49,9 @@ uint32 sizeBytes[4] = {0,1,2,4};
 inline uint32 Txl2Words(uint32 width, uint32 size)
 {
     if( size == TXT_SIZE_4b )
-        return std::max(1, width/16);
+        return std::max(1U, width/16);
     else
-        return std::max(1, width*sizeBytes[size]/8);
+        return std::max(1U, width*sizeBytes[size]/8);
 }
 
 inline uint32 CalculateImgSize(uint32 width, uint32 height, uint32 size)
