@@ -1089,8 +1089,8 @@ uint32 LightVert(XVECTOR4 & norm, int vidx)
                 if (fCosT > 0 )
                 {
                     //float f = d2/gRSPlights[l].range*50;
-                    float f = d2/15000*50;
-                    f = 1 - std::min(f,1);
+                    float f = d2 / 15000.0 * 50.0;
+                    f = 1.0 - std::min(f,1.0);
                     fCosT *= f*f;
 
                     r += gRSPlights[l].fr * fCosT;
@@ -1101,9 +1101,9 @@ uint32 LightVert(XVECTOR4 & norm, int vidx)
         }
     }
 
-    if (r > 255) r = 255;
-    if (g > 255) g = 255;
-    if (b > 255) b = 255;
+    if (r > 255.0) r = 255.0;
+    if (g > 255.0) g = 255.0;
+    if (b > 255.0) b = 255.0;
     return ((0xff000000)|(((uint32)r)<<16)|(((uint32)g)<<8)|((uint32)b));
 }
 
