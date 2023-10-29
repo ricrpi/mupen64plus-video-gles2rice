@@ -751,11 +751,11 @@ void SetFogMinMax(float fMin, float fMax, float fMul, float fOffset)
     }
 
     {
-        gRSPfFogMin = std::max(0,fMin/500-1);
-        gRSPfFogMax = fMax/500-1;
+        gRSPfFogMin = std::max(0.0,fMin / 500.0 - 1.0);
+        gRSPfFogMax = fMax / 500.0 - 1.0;
     }
 
-    gRSPfFogDivider = 255/(gRSPfFogMax-gRSPfFogMin);
+    gRSPfFogDivider = 255.0 / (gRSPfFogMax-gRSPfFogMin);
     CRender::g_pRender->SetFogMinMax(fMin, fMax);
 }
 
